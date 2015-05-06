@@ -38,7 +38,7 @@ module Streamalicious {
     export interface Predicate<T> {
         (value: T): boolean;
     }
-    
+
     class FilteringStreamable<T> implements Streamable<T> {
         private streamable: Streamable<T>;
         private filter: Predicate<T>;
@@ -110,8 +110,13 @@ module Streamalicious {
                 this.otherCache.content = null;
                 return part;
             }
+            
             part = this.streamable.getPart();
-            this.myCache.content = this.myCache.content ? this.myCache.content.concat(part) : part;
+            if (!part) {
+                return null;
+            }
+            
+            this.myCache.content = (this.myCache.content ? this.myCache.content.concat(part) : part);            
             return part;
         }
     }
@@ -160,7 +165,7 @@ module Streamalicious {
 module Streamalicious.Utils {
     class ArrayStreamable<T> implements Streamable<T> {
         private array: T[];
-        
+
         constructor(array: T[]) {
             this.array = array;
         }
@@ -175,7 +180,7 @@ module Streamalicious.Utils {
     class RangeStreamable implements Streamable<number> {
         private current: number;
         private last: number;
-        
+
         constructor(first: number, last: number) {
             this.current = first;
             this.last = last;
@@ -271,6 +276,18 @@ module Streamalicious.Utils {
         }
     }
 
+    class ArrayCollector<T> implements Collector<T, T[]> {
+        collect(streamable: Streamable<T>) {
+            var all: T[] = [];
+            var part: T[];
+            while (part = streamable.getPart()) {
+                all = all.concat(part);
+            }
+
+            return all;
+        }
+    }
+
     export class CollectorBuilder {
         static createStringJoining(seperator: string) {
             return new StringCollector(seperator);
@@ -281,6 +298,10 @@ module Streamalicious.Utils {
 
         static createHasAny<T>(predicate: Predicate<T>) {
             return new HasAnyCollector(predicate);
+        }
+
+        static createArray<T>() {
+            return new ArrayCollector();
         }
     }
 }
@@ -317,13 +338,22 @@ module TestBed {
     var streams = sb.fromSource(() => { return [Math.random()]; })
         .limit(5)
         .split();
-    var result6 = streams[1]
+    var result6 = streams[0]
         .transform((item: number) => { return "" + item; })
         .collect(cb.createStringJoining(", "));
     console.log("5 random values: " + result6);
+    
+    // Split remaining stream again:
+    streams = streams[1].split();
 
     var result7 = streams[0]
         .transform(function(item: number) { return "" + item; })
         .collect(cb.createHasAny(function(element) { return element < 0.1; }));
     console.log("5 random values has any under 0.1: " + result7);
+
+    var result8 = streams[1]
+        .collect(cb.createArray());
+    console.log("And this is what it looks like as an array: ");
+    console.log(result8);
+
 }
