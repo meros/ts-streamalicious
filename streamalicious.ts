@@ -1,359 +1,399 @@
-module Streamalicious.Log {
-    export function log(message: string): void {
-        //		console.log(message);
-    }
+module streamalicious.core.asyncqueue {
+	interface AsyncQueueOperation<T> {
+		(callback: Consumer<T>): void;
+	}
+
+	interface AsyncQueueJob<T> {
+		value: T;
+		done: boolean;
+		callback: Consumer<T>;
+	}
+
+	interface AsyncQueueReadyForMoreCallback {
+		(): void;
+	}
+
+	export class AsyncQueue<T> {
+		private maxLength: number;
+		private queue: AsyncQueueJob<T>[] = [];
+		private readyForMore: AsyncQueueReadyForMoreCallback = null;
+
+		constructor(maxLength: number) {
+			this.maxLength = maxLength;
+		}
+
+		private operationDone(job: AsyncQueueJob<T>, value: T) {
+			job.done = true;
+			job.value = value;
+
+			this.updateQueue();
+		}
+
+		private updateQueue() {
+			var readyForMore = this.readyForMore;
+
+			while (this.queue.length) {
+				if (!this.queue[0].done) {
+					break;
+				}
+
+				var job = this.queue.shift();
+				job.callback(job.value);
+			}
+
+			if (this.queue.length < this.maxLength && readyForMore) {
+				this.readyForMore = null;
+				readyForMore();
+			}
+		}
+
+		public push(operation: AsyncQueueOperation<T>, callback: Consumer<T>, readyForMore: AsyncQueueReadyForMoreCallback) {
+			var job: AsyncQueueJob<T> = {
+				value: null,
+				done: false,
+				callback: callback
+			};
+
+			this.queue.push(job);
+			operation((value: T) => {
+				this.operationDone(job, value);
+			});
+
+			if (this.queue.length < this.maxLength) {
+				readyForMore();
+			} else {
+				this.readyForMore = readyForMore;
+			}
+		}
+	}
 }
 
-module Streamalicious {
+module streamalicious.core {
+	export interface Consumer<T> {
+		(value: T): void;
+	}
 
-    export interface Streamable<T> {
-        getPart(): T[];
-    }
+	export interface Streamable<T> {
+		requestPart(callback: Consumer<T[]>);
+	}
 
-    interface Transformer<T, U> {
-        (value: T): U;
-    }
+	export interface CollectorCollectPartResult<T> {
+		done: boolean;
+		value?: T;
+	}
 
-    class TransformingStreamable<T, U> implements Streamable<U> {
-        private streamable: Streamable<T>;
-        private transformer: Transformer<T, U>;
+	export interface Collector<T, U> {
+		collectPart(part: T[]): CollectorCollectPartResult<U>;
+	}
 
-        constructor(streamable: Streamable<T>, transformer: Transformer<T, U>) {
-            this.streamable = streamable;
-            this.transformer = transformer;
-        }
+	export interface StatelessTransformer<T, U> {
+		transformPart(part: T[], callback: Consumer<U[]>): void;
+	}
 
-        getPart() {
-            var part = this.streamable.getPart();
-            Streamalicious.Log.log("Untransformed part: " + part);
-            if (!part) {
-                return null;
-            }
-            var transformedPart = part.map(this.transformer);
-            Streamalicious.Log.log("Transformed part: " + transformedPart);
-            return transformedPart;
-        }
-    }
+	class StatelessTransformingStreamable<T, U> implements Streamable<U>{
+		private transformer: StatelessTransformer<T, U>;
+		private streamable: Streamable<T>;
+		constructor(streamable: Streamable<T>, transformer: StatelessTransformer<T, U>) {
+			this.transformer = transformer;
+			this.streamable = streamable;
+		}
 
-    export interface Predicate<T> {
-        (value: T): boolean;
-    }
+		requestPart(callback: Consumer<U[]>) {
+			this.streamable.requestPart((part: T[]) => {
+				this.transformer.transformPart(part, callback);
+			})
+		}
+	}
 
-    class FilteringStreamable<T> implements Streamable<T> {
-        private streamable: Streamable<T>;
-        private filter: Predicate<T>;
+	export class CoreStream<T> {
+		private streamable: Streamable<T>
 
-        constructor(streamable: Streamable<T>, filter: Predicate<T>) {
-            this.streamable = streamable;
-            this.filter = filter;
-        }
+		constructor(streamable: Streamable<T>) {
+			this.streamable = streamable;
+		}
 
-        getPart() {
-            var part = this.streamable.getPart();
-            Streamalicious.Log.log("Unfiltered part: " + part);
-            if (!part) {
-                return null;
-            }
-            var filteredPart = part.filter(this.filter);
-            Streamalicious.Log.log("Filterd part: " + filteredPart);
-            return filteredPart;
-        }
-    }
+		statelessTransform<U>(transformer: StatelessTransformer<T, U>): CoreStream<U> {
+			return new CoreStream<U>(new StatelessTransformingStreamable<T, U>(this.streamable, transformer));
+		}
 
-    class LimitingStreamable<T> implements Streamable<T> {
-        private streamable: Streamable<T>;
-        private lengthLeft: number;
+		collect<U>(collector: Collector<T, U>, callback: Consumer<U>) {
+			// Bootstrap the collecting
+			this.collectPart({
+				// TODO: need to be able to set max paralell calls from the outside somehow!
+				queue: new asyncqueue.AsyncQueue<T[]>(50),
+				collector: collector,
+				callback: callback,
+				done: false
+			});
+		}
 
-        constructor(streamable: Streamable<T>, length: number) {
-            this.streamable = streamable;
-            this.lengthLeft = length;
-        }
-
-        getPart() {
-            if (this.lengthLeft === 0) {
-                return null;
-            }
-            var part = this.streamable.getPart();
-            if (!part) {
-                return null;
-            }
-            if (this.lengthLeft >= part.length) {
-                this.lengthLeft -= part.length;
-                return part;
-            }
-            var limitedPart = part.slice(0, this.lengthLeft);
-            Streamalicious.Log.log("Limited part: " + limitedPart);
-            this.lengthLeft = 0;
-            return limitedPart;
-        }
-    }
-
-    interface SplittingCache<T> {
-        content: T[];
-    }
-
-    class SplittingStreamable<T> implements Streamable<T> {
-        private streamable: Streamable<T>;
-        private myCache: SplittingCache<T>;
-        private otherCache: SplittingCache<T>;
-
-        constructor(streamable: Streamable<T>, myCache: SplittingCache<T>, otherCache: SplittingCache<T>) {
-            this.streamable = streamable;
-            this.myCache = myCache;
-            this.otherCache = otherCache;
-        }
-
-        getPart() {
-            var part: T[];
-            if (this.otherCache.content) {
-                part = this.otherCache.content;
-                this.otherCache.content = null;
-                return part;
-            }
-            
-            part = this.streamable.getPart();
-            if (!part) {
-                return null;
-            }
-            
-            this.myCache.content = (this.myCache.content ? this.myCache.content.concat(part) : part);            
-            return part;
-        }
-    }
-
-    export interface Collector<T, U> {
-        collect(streamable: Streamable<T>): U;
-    }
-
-    interface Transformer<T, U> {
-        (value: T): U;
-    }
-
-    export class Stream<T> {
-        private streamable: Streamable<T>;
-
-        constructor(streamable: Streamable<T>) {
-            this.streamable = streamable;
-        }
-
-        collect<U>(collector: Collector<T, U>) {
-            return collector.collect(this.streamable);
-        }
-
-        transform<U>(transformer: Transformer<T, U>) {
-            return new Stream(new TransformingStreamable(this.streamable, transformer));
-        }
-
-        filter(filter: Predicate<T>) {
-            return new Stream(new FilteringStreamable(this.streamable, filter));
-        }
-
-        limit(length: number) {
-            return new Stream(new LimitingStreamable(this.streamable, length));
-        }
-
-        split() {
-            var leftCache: SplittingCache<T> = { content: null };
-            var rightCache: SplittingCache<T> = { content: null };
-            var left = new SplittingStreamable(this.streamable, leftCache, rightCache);
-            var right = new SplittingStreamable(this.streamable, rightCache, leftCache);
-            return [new Stream(left), new Stream(right)];
-        }
-    }
+		private collectPart<U>(state: { queue: asyncqueue.AsyncQueue<T[]>; collector: Collector<T, U>; callback: Consumer<U>; done: boolean }) {
+			state.queue.push(
+				// Operation to do
+				(callback: Consumer<T[]>) => {
+					this.streamable.requestPart(callback);
+				},
+				// A value is delivered (these are called in order)
+				(part: T[]) => {
+					if (!state.done) {
+						var result = state.collector.collectPart(part);
+						state.done = result.done || !part;
+						if (result.done) {
+							// Since we are done, lets call the initiator of the collection operation
+							state.callback(result.value);
+						}
+					}
+				},
+				// What to do when there is more space in the queue
+				() => {
+					if (!state.done) {
+						this.collectPart(state);
+					}
+				});
+		}
+	}
 }
 
-module Streamalicious.Utils {
-    class ArrayStreamable<T> implements Streamable<T> {
-        private array: T[];
-
-        constructor(array: T[]) {
-            this.array = array;
-        }
-
-        getPart() {
-            var part = this.array;
-            this.array = null;
-            return part;
-        }
-    }
-
-    class RangeStreamable implements Streamable<number> {
-        private current: number;
-        private last: number;
-
-        constructor(first: number, last: number) {
-            this.current = first;
-            this.last = last;
-        }
-
-        getPart() {
-            if (this.current > this.last) {
-                return null;
-            }
-            var result = [this.current];
-            this.current++;
-            return result;
-        }
-    }
-
-    interface StreamSource<T> {
-        (): T[];
-    }
-
-    class SourceStreamable<T> implements Streamable<T> {
-        private source: StreamSource<T>;
-
-        constructor(source: StreamSource<T>) {
-            this.source = source;
-        }
-
-        getPart() {
-            return this.source();
-        }
-    }
-
-    export class StreamBuilder {
-        static fromArray<T>(array: T[]) {
-            return new Stream(new ArrayStreamable(array));
-        }
-
-        static fromRange(first: number, last: number) {
-            return new Stream(new RangeStreamable(first, last));
-        }
-
-        static fromSource<T>(source: StreamSource<T>) {
-            return new Stream(new SourceStreamable(source));
-        }
-    }
-
-    class StringCollector implements Collector<string, string> {
-        private seperator: string;
-
-        constructor(seperator: string) {
-            if (seperator === void 0) { seperator = ""; }
-            this.seperator = seperator;
-        }
-
-        collect(streamable: Streamable<string>) {
-            var all: string[] = [];
-            var part: string[];
-            while (part = streamable.getPart()) {
-                all = all.concat(part);
-            }
-            ;
-            return all.join(this.seperator);
-        }
-    }
-
-
-    class CountCollector<T> implements Collector<T, number> {
-        collect(streamable: Streamable<T>) {
-            var count = 0;
-            var part: T[];
-            while (part = streamable.getPart()) {
-                count += part.length;
-            }
-            return count;
-        }
-    }
-
-    class HasAnyCollector<T> implements Collector<T, boolean> {
-        private predicate: Predicate<T>;
-
-        constructor(predicate: Predicate<T>) {
-            this.predicate = predicate;
-        }
-
-        collect(streamable: Streamable<T>) {
-            var part: T[];
-            while (part = streamable.getPart()) {
-                if (part.some(this.predicate)) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-    }
-
-    class ArrayCollector<T> implements Collector<T, T[]> {
-        collect(streamable: Streamable<T>) {
-            var all: T[] = [];
-            var part: T[];
-            while (part = streamable.getPart()) {
-                all = all.concat(part);
-            }
-
-            return all;
-        }
-    }
-
-    export class CollectorBuilder {
-        static createStringJoining(seperator: string) {
-            return new StringCollector(seperator);
-        }
-        static createCounting() {
-            return new CountCollector();
-        }
-
-        static createHasAny<T>(predicate: Predicate<T>) {
-            return new HasAnyCollector(predicate);
-        }
-
-        static createArray<T>() {
-            return new ArrayCollector();
-        }
-    }
+module streamalicious {
+	export class Stream<T> extends core.CoreStream<T> {
+		constructor(streamable: core.Streamable<T>) {
+			super(streamable);
+		}
+	}
 }
 
-module TestBed {
-    var sb = Streamalicious.Utils.StreamBuilder;
-    var cb = Streamalicious.Utils.CollectorBuilder;
+module streamalicious.streams {
+	class ArrayStreamable<T> implements core.Streamable<T>{
+		private array: T[];
 
-    var result = sb.fromArray([1, 2, 3, 4])
-        .transform((item: number) => { return "" + item; })
-        .collect(cb.createStringJoining(", "));
-    console.log("Result from array: " + result);
+		constructor(array: T[]) {
+			this.array = array;
+		}
 
-    var result2 = sb.fromRange(0, 42)
-        .transform((item: number) => { return "" + item; })
-        .collect(cb.createArray());
-    console.log("Result from range: " + result2);
+		public requestPart(callback: core.Consumer<T[]>) {
+			callback(this.array);
+			this.array = null;
+		}
+	}
 
-    var result3 = sb.fromRange(1, 1000)
-        .collect(cb.createCounting());
-    console.log("Result from counting collector: " + result3);
+	export function fromArray<T>(array: T[]): Stream<T> {
+		return new Stream<T>(new ArrayStreamable(array));
+	}
 
-    var result4 = sb.fromRange(1, 1000)
-        .limit(42)
-        .collect(cb.createCounting());
-    console.log("Result from limited counting collector: " + result4);
+	class SleepIncrementerStreamable implements core.Streamable<number>{
+		private value: number = 0;
+		private maxValue: number;
 
-    var result5 = sb.fromRange(1, 1000)
-        .limit(5)
-        .transform((item: number) => { return "" + item; })
-        .collect(cb.createStringJoining(", "));
-    console.log("First 5 values in range: " + result5);
+		constructor(maxValue: number) {
+			this.maxValue = maxValue;
+		}
 
-    var streams = sb.fromSource(() => { return [Math.random()]; })
-        .limit(5)
-        .split();
-    var result6 = streams[0]
-        .transform((item: number) => { return "" + item; })
-        .collect(cb.createStringJoining(", "));
-    console.log("5 random values: " + result6);
-    
-    // Split remaining stream again:
-    streams = streams[1].split();
+		public requestPart(callback: core.Consumer<number[]>) {
+			var currentValue = this.value++;
+			if (currentValue > 100) {
+				callback(null);
+			} else {
+				setTimeout(() => {
+					callback([currentValue]);
+				}, Math.random() * 1000);
+			}
+		}
+	}
 
-    var result7 = streams[0]
-        .transform(function(item: number) { return "" + item; })
-        .collect(cb.createHasAny(function(element) { return element < 0.1; }));
-    console.log("5 random values has any under 0.1: " + result7);
-
-    var result8 = streams[1]
-        .collect(cb.createArray());
-    console.log("And this is what it looks like as an array: ");
-    console.log(result8);
-
+	export function debugSleepIncremeneter(maxValue: number): Stream<number> {
+		return new Stream<number>(new SleepIncrementerStreamable(maxValue));
+	}
 }
+
+module streamalicious.collectors {
+	class CountCollector<T> implements streamalicious.core.Collector<T, number> {
+		private count: number = 0;
+
+		public collectPart(part: T[]): streamalicious.core.CollectorCollectPartResult<number> {
+			if (!part) {
+				// I am done...
+				return { done: true, value: this.count };
+			}
+		
+			// Add to count and keep going!
+			this.count += part.length;
+			return { done: false };
+		}
+	}
+
+	class ArrayCollector<T> implements streamalicious.core.Collector<T, T[]> {
+		private result: T[] = [];
+
+		public collectPart(part: T[]): streamalicious.core.CollectorCollectPartResult<T[]> {
+			if (!part) {
+				// I am done...
+				return { done: true, value: this.result };
+			}
+
+			// Add to result array and keep going
+			this.result = this.result.concat(part);
+			return { done: false };
+		}
+	}
+
+	export function toCount<T>() {
+		return new CountCollector<T>();
+	}
+
+	export function toArray<T>() {
+		return new ArrayCollector<T>();
+	}
+}
+
+module streamalicious.statelesstransforms {
+	class StringDuplicationTransform implements core.StatelessTransformer<string, string> {
+		transformPart(part: string[], callback: streamalicious.core.Consumer<string[]>): void {
+			callback(part ? part.map((value) => { return value + value }) : part);
+		}
+	}
+
+	export function stringDuplication(): core.StatelessTransformer<string, string> {
+		return new StringDuplicationTransform;
+	}
+
+	class SleepingNoopTransform<T> implements core.StatelessTransformer<T, T> {
+		transformPart(part: T[], callback: streamalicious.core.Consumer<T[]>): void {
+			setTimeout(() => {
+				callback(part);
+			}, 1000);
+		}
+	}
+
+	export function debugSleepingNoopTransform<T>(): core.StatelessTransformer<T, T> {
+		return new SleepingNoopTransform<T>();
+	}
+
+	interface AsyncTransformerOperation<T, U> {
+		(value: T, callback: streamalicious.core.Consumer<U>): void;
+	}
+
+	class AsyncTransformer<T, U> implements streamalicious.core.StatelessTransformer<T, U> {
+		private waitingFor: { value: T, done: boolean }[] = [];
+		private debug = true;
+
+		private operation: AsyncTransformerOperation<T, U>;
+		constructor(operation: AsyncTransformerOperation<T, U>) {
+			this.operation = operation;
+		}
+
+		private debugPrint() {
+			if (!this.debug) {
+				return;
+			}
+
+			console.log("--------------- Debug for async operation, outstanding transforms ---------------")
+			console.log("Number of outstading: " + this.waitingFor.filter((value) => { return !value.done }).length);
+			for (var i = 0, len = this.waitingFor.length; i < len; i++) {
+				if (!this.waitingFor[i].done) {
+					console.log(this.waitingFor[i].value);
+				}
+			}
+			console.log("---------------------------------------------------------------------------------")
+		}
+
+		transformPart(part: T[], callback: streamalicious.core.Consumer<U[]>): void {
+			if (!part) {
+				callback(null);
+			} else {
+				var count = part.length;
+				var result: U[] = [];
+				for (var i = 0, len = part.length; i < len; i++) {
+					((myIndex: number) => {
+						var debugPart = { value: part[myIndex], done: false };
+						this.waitingFor.push(debugPart);
+
+						this.operation(part[myIndex], (value: U) => {
+							debugPart.done = true;
+							this.debugPrint();
+
+							result[myIndex] = value;
+							count--;
+							if (count === 0) {
+								callback(result);
+							}
+						});
+					})(i);
+				}
+			}
+		}
+	}
+
+	export function asyncTransform<T, U>(operation: AsyncTransformerOperation<T, U>): core.StatelessTransformer<T, U> {
+		return new AsyncTransformer<T, U>(operation);
+	}
+}
+
+// Some node specific stuff
+declare function require(name: string): any;
+
+var lineReader = require('line-reader');
+module streamalicious.node.streams {
+	class FileWithLinesStreamable implements core.Streamable<string>{
+		private lr: any;
+
+		private lines: string[] = [];
+		private waitingRequests: core.Consumer<string[]>[] = [];
+		private noMoreLines: boolean = false;
+
+		constructor(filename: string) {
+			lineReader.eachLine(filename, (line) => {
+				this.lines.push(line);
+				this.processWaitingRequests();
+			}).then(() => {
+				this.noMoreLines = true;
+				this.processWaitingRequests();
+			});
+		}
+
+		requestPart(callback: core.Consumer<string[]>) {
+			this.waitingRequests.push(callback);
+			this.processWaitingRequests();
+		}
+
+		private processWaitingRequests() {
+			while (this.waitingRequests.length > 0) {
+				if (this.lines.length) {
+					this.waitingRequests.shift()([this.lines.shift()]);
+				} else if (this.noMoreLines) {
+					this.waitingRequests.shift()(null);
+				} else {
+					// No more lines, but also not done. Let those who wait wait some more...
+					break;
+				}
+			}
+		}
+	}
+
+
+	export function fromFileWithLines(filename: string): Stream<string> {
+		return new Stream(new FileWithLinesStreamable(filename));
+	}
+}
+
+// Async transform from url to url/statuscode (it will normally take some time, and thats the point, it's async)
+var request = require('request');
+var urlStatusCheckTransform = streamalicious.statelesstransforms.asyncTransform(
+	(url: string, callback: streamalicious.core.Consumer<{ url: string, status: number }>) => {
+		request(url, (error, response, body) => {
+			callback({
+				url: url,
+				status: (response ? response.statusCode : 0)
+			});
+		});
+	});
+
+// Read file (async line by line), request the url and record the status code
+// Note that this test might take several minutes, but thats mostly because some of the hosts do have ping times that are in that range strangely enough
+streamalicious.node.streams.fromFileWithLines("placestoping.txt").
+// Convert url to url + status code
+	statelessTransform(urlStatusCheckTransform).
+// Collect to array
+	collect(streamalicious.collectors.toArray(), (result: { url: string, status: number }[]) => console.log(result.sort((a, b) => { return a.status - b.status })));
+
+
+
