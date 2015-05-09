@@ -10,7 +10,6 @@ http://blog-search.net/up.php
 http://blog.goo.ne.jp/XMLRPC
 http://blogbot.dk/io/xml-rpc.php
 http://blogdigger.com/RPC2
-http://bloglines.com/ping
 http://blogpeople.net/servlet/weblogUpdates
 http://blogsdominicanos.com/ping/
 http://blogsearch.google.com/ping/RPC2

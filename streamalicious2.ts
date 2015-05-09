@@ -120,7 +120,7 @@ module streamalicious.core {
 			// Bootstrap the collecting
 			this.collectPart({
 				// TODO: need to be able to set max paralell calls from the outside somehow!
-				queue: new asyncqueue.AsyncQueue<T[]>(100),
+				queue: new asyncqueue.AsyncQueue<T[]>(50),
 				collector: collector,
 				callback: callback,
 				done: false
@@ -258,7 +258,6 @@ module streamalicious.statelesstransforms {
 
 	class SleepingNoopTransform<T> implements core.StatelessTransformer<T, T> {
 		transformPart(part: T[], callback: streamalicious.core.Consumer<T[]>): void {
-			console.log("Sleeping 1000 ms");
 			setTimeout(() => {
 				callback(part);
 			}, 1000);
@@ -274,9 +273,27 @@ module streamalicious.statelesstransforms {
 	}
 
 	class AsyncTransformer<T, U> implements streamalicious.core.StatelessTransformer<T, U> {
+		private waitingFor: { value: T, done: boolean }[] = [];
+		private debug = true;
+
 		private operation: AsyncTransformerOperation<T, U>;
 		constructor(operation: AsyncTransformerOperation<T, U>) {
 			this.operation = operation;
+		}
+
+		private debugPrint() {
+			if (!this.debug) {
+				return;
+			}
+
+			console.log("--------------- Debug for async operation, outstanding transforms ---------------")
+			console.log("Number of outstading: " + this.waitingFor.filter((value) => { return !value.done }).length);
+			for (var i = 0, len = this.waitingFor.length; i < len; i++) {
+				if (!this.waitingFor[i].done) {
+					console.log(this.waitingFor[i].value);
+				}
+			}
+			console.log("---------------------------------------------------------------------------------")
 		}
 
 		transformPart(part: T[], callback: streamalicious.core.Consumer<U[]>): void {
@@ -286,18 +303,21 @@ module streamalicious.statelesstransforms {
 				var count = part.length;
 				var result: U[] = [];
 				for (var i = 0, len = part.length; i < len; i++) {
+					((myIndex: number) => {
+						var debugPart = { value: part[myIndex], done: false };
+						this.waitingFor.push(debugPart);
 
-					var closure = (index: number) => {
-						this.operation(part[index], (value: U) => {
-							result[index] = value;
+						this.operation(part[myIndex], (value: U) => {
+							debugPart.done = true;
+							this.debugPrint();
+
+							result[myIndex] = value;
 							count--;
 							if (count === 0) {
 								callback(result);
 							}
 						});
-					};
-
-					closure(i);
+					})(i);
 				}
 			}
 		}
@@ -308,29 +328,72 @@ module streamalicious.statelesstransforms {
 	}
 }
 
+// Some node specific stuff
 declare function require(name: string): any;
-var request = require('request');
 
+var lineReader = require('line-reader');
+module streamalicious.node.streams {
+	class FileWithLinesStreamable implements core.Streamable<string>{
+		private lr: any;
+
+		private lines: string[] = [];
+		private waitingRequests: core.Consumer<string[]>[] = [];
+		private noMoreLines: boolean = false;
+
+		constructor(filename: string) {
+			lineReader.eachLine(filename, (line) => {
+				this.lines.push(line);
+				this.processWaitingRequests();
+			}).then(() => {
+				this.noMoreLines = true;
+				this.processWaitingRequests();
+			});
+		}
+
+		requestPart(callback: core.Consumer<string[]>) {
+			this.waitingRequests.push(callback);
+			this.processWaitingRequests();
+		}
+
+		private processWaitingRequests() {
+			while (this.waitingRequests.length > 0) {
+				if (this.lines.length) {
+					this.waitingRequests.shift()([this.lines.shift()]);
+				} else if (this.noMoreLines) {
+					this.waitingRequests.shift()(null);
+				} else {
+					// No more lines, but also not done. Let those who wait wait some more...
+					break;
+				}
+			}
+		}
+	}
+
+
+	export function fromFileWithLines(filename: string): Stream<string> {
+		return new Stream(new FileWithLinesStreamable(filename));
+	}
+}
+
+// Async transform from url to url/statuscode (it will normally take some time, and thats the point, it's async)
+var request = require('request');
 var urlStatusCheckTransform = streamalicious.statelesstransforms.asyncTransform(
-	(url: string, callback: streamalicious.core.Consumer<number>) =>
-		request(url, (error, response, body) => callback(response ? response.statusCode : 42)));
-		
-var test = streamalicious.streams.fromArray(
-	["http://www.google.com",
-		"http://www.yahoo.com",
-		"http://www.google.com",
-		"http://www.yahoo.com",
-		"http://www.google.com",
-		"http://www.yahoo.com",
-		"http://www.google.com",
-		"http://www.yahoo.com",
-		"http://www.google.com",
-		"http://www.yahoo.com",
-		"http://www.aöskldjföajiowej.se"]).
+	(url: string, callback: streamalicious.core.Consumer<{ url: string, status: number }>) => {
+		request(url, (error, response, body) => {
+			callback({
+				url: url,
+				status: (response ? response.statusCode : 0)
+			});
+		});
+	});
+
+// Read file (async line by line), request the url and record the status code
+// Note that this test might take several minutes, but thats mostly because some of the hosts do have ping times that are in that range strangely enough
+streamalicious.node.streams.fromFileWithLines("placestoping.txt").
+// Convert url to url + status code
 	statelessTransform(urlStatusCheckTransform).
-	collect(streamalicious.collectors.toArray(), (result) => {
-	console.log("Statuses are: " + result);
-});
+// Collect to array
+	collect(streamalicious.collectors.toArray(), (result: { url: string, status: number }[]) => console.log(result.sort((a, b) => { return a.status - b.status })));
 
 
 
