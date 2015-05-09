@@ -18,7 +18,7 @@ module streamalicious.core.asyncqueue {
 		private queue: AsyncQueueJob<T>[] = [];
 		private readyForMore: AsyncQueueReadyForMoreCallback = null;
 
-		constructor(maxLength: number = 100) {
+		constructor(maxLength: number) {
 			this.maxLength = maxLength;
 		}
 
@@ -87,6 +87,25 @@ module streamalicious.core {
 	}
 
 
+	export interface StatelessTransformer<T, U> {
+		transformPart(part: T[], callback: Consumer<U[]>): void;
+	}
+
+	class StatelessTransformingStreamable<T, U> implements Streamable<U>{
+		private transformer: StatelessTransformer<T, U>;
+		private streamable: Streamable<T>;
+		constructor(streamable: Streamable<T>, transformer: StatelessTransformer<T, U>) {
+			this.transformer = transformer;
+			this.streamable = streamable;
+		}
+
+		requestPart(callback: Consumer<U[]>) {
+			this.streamable.requestPart((part: T[]) => {
+				this.transformer.transformPart(part, callback);
+			})
+		}
+	}
+
 	export class CoreStream<T> {
 		private streamable: Streamable<T>
 
@@ -94,17 +113,22 @@ module streamalicious.core {
 			this.streamable = streamable;
 		}
 
+		statelessTransform<U>(transformer: StatelessTransformer<T, U>): CoreStream<U> {
+			return new CoreStream<U>(new StatelessTransformingStreamable<T, U>(this.streamable, transformer));
+		}
+
 		collect<U>(collector: Collector<T, U>, callback: Consumer<U>) {
 			// Bootstrap the collecting
 			this.collectPart({
-				queue: new asyncqueue.AsyncQueue<T[]>(),
+				// TODO: need to be able to set max paralell calls from the outside somehow!
+				queue: new asyncqueue.AsyncQueue<T[]>(100),
 				collector: collector,
 				callback: callback,
 				done: false
 			});
 		}
 
-		private collectPart<U>(state: {queue: asyncqueue.AsyncQueue<T[]>; collector: Collector<T, U>; callback: Consumer<U>; done: boolean}) {				
+		private collectPart<U>(state: { queue: asyncqueue.AsyncQueue<T[]>; collector: Collector<T, U>; callback: Consumer<U>; done: boolean }) {
 			state.queue.push(
 				// Operation to do
 				(callback: Consumer<T[]>) => {
@@ -159,6 +183,11 @@ module streamalicious.streams {
 
 	class SleepIncrementerStreamable implements core.Streamable<number>{
 		private value: number = 0;
+		private maxValue: number;
+
+		constructor(maxValue: number) {
+			this.maxValue = maxValue;
+		}
 
 		public requestPart(callback: core.Consumer<number[]>) {
 			var currentValue = this.value++;
@@ -172,33 +201,63 @@ module streamalicious.streams {
 		}
 	}
 
-	export function debugSleepIncremeneter(): Stream<number> {
-		return new Stream<number>(new SleepIncrementerStreamable());
+	export function debugSleepIncremeneter(maxValue: number): Stream<number> {
+		return new Stream<number>(new SleepIncrementerStreamable(maxValue));
 	}
 }
 
 module streamalicious.collectors {
-	class CountCollector implements streamalicious.core.Collector<number, number> {
-	private count: number = 0;
+	class CountCollector<T> implements streamalicious.core.Collector<T, number> {
+		private count: number = 0;
 
-	public collectPart(part: number[]): streamalicious.core.CollectorCollectPartResult<number> {
-		if (!part) {
-			// I am done...
-			return { done: true, value: this.count };
-		}
-
-		for (var i = 0, len = part.length; i < len; i++) {
-			this.count += part[i];
-		}
+		public collectPart(part: T[]): streamalicious.core.CollectorCollectPartResult<number> {
+			if (!part) {
+				// I am done...
+				return { done: true, value: this.count };
+			}
 		
-		// Keep going!
-		return { done: false };
+			// Add to count and keep going!
+			this.count += part.length;
+			return { done: false };
+		}
+	}
+
+	class ArrayCollector<T> implements streamalicious.core.Collector<T, T[]> {
+		private result: T[] = [];
+
+		public collectPart(part: T[]): streamalicious.core.CollectorCollectPartResult<T[]> {
+			if (!part) {
+				// I am done...
+				return { done: true, value: this.result };
+			}
+
+			// Add to result array and keep going
+			this.result = this.result.concat(part);
+			return { done: false };
+		}
+	}
+
+	export function toCount<T>() {
+		return new CountCollector<T>();
+	}
+
+	export function toArray<T>() {
+		return new ArrayCollector<T>();
 	}
 }
+
+class TestTransformer implements streamalicious.core.StatelessTransformer<string, string> {
+	transformPart(part: string[], callback: streamalicious.core.Consumer<string[]>): void {
+		callback(part ? part.map((value) => { return value + value }) : part);
+	}
 }
 
-var stream = streamalicious.streams.debugSleepIncremeneter();
-
-stream.collect(new CountCollector, (count: number) => {
-	console.log("Count is: " + count);
+streamalicious.streams.fromArray(
+	["http://www.google.com",
+		"http://www.yahoo.com",
+		"http://www.aftonbladet.se"]).
+	statelessTransform(new TestTransformer).
+	collect(streamalicious.collectors.toArray(), (result) => {
+	// Counting is done...
+	console.log("Count is: " + result);
 });
