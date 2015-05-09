@@ -86,7 +86,6 @@ module streamalicious.core {
 		collectPart(part: T[]): CollectorCollectPartResult<U>;
 	}
 
-
 	export interface StatelessTransformer<T, U> {
 		transformPart(part: T[], callback: Consumer<U[]>): void;
 	}
@@ -246,18 +245,92 @@ module streamalicious.collectors {
 	}
 }
 
-class TestTransformer implements streamalicious.core.StatelessTransformer<string, string> {
-	transformPart(part: string[], callback: streamalicious.core.Consumer<string[]>): void {
-		callback(part ? part.map((value) => { return value + value }) : part);
+module streamalicious.statelesstransforms {
+	class StringDuplicationTransform implements core.StatelessTransformer<string, string> {
+		transformPart(part: string[], callback: streamalicious.core.Consumer<string[]>): void {
+			callback(part ? part.map((value) => { return value + value }) : part);
+		}
+	}
+
+	export function stringDuplication(): core.StatelessTransformer<string, string> {
+		return new StringDuplicationTransform;
+	}
+
+	class SleepingNoopTransform<T> implements core.StatelessTransformer<T, T> {
+		transformPart(part: T[], callback: streamalicious.core.Consumer<T[]>): void {
+			console.log("Sleeping 1000 ms");
+			setTimeout(() => {
+				callback(part);
+			}, 1000);
+		}
+	}
+
+	export function debugSleepingNoopTransform<T>(): core.StatelessTransformer<T, T> {
+		return new SleepingNoopTransform<T>();
+	}
+
+	interface AsyncTransformerOperation<T, U> {
+		(value: T, callback: streamalicious.core.Consumer<U>): void;
+	}
+
+	class AsyncTransformer<T, U> implements streamalicious.core.StatelessTransformer<T, U> {
+		private operation: AsyncTransformerOperation<T, U>;
+		constructor(operation: AsyncTransformerOperation<T, U>) {
+			this.operation = operation;
+		}
+
+		transformPart(part: T[], callback: streamalicious.core.Consumer<U[]>): void {
+			if (!part) {
+				callback(null);
+			} else {
+				var count = part.length;
+				var result: U[] = [];
+				for (var i = 0, len = part.length; i < len; i++) {
+
+					var closure = (index: number) => {
+						this.operation(part[index], (value: U) => {
+							result[index] = value;
+							count--;
+							if (count === 0) {
+								callback(result);
+							}
+						});
+					};
+
+					closure(i);
+				}
+			}
+		}
+	}
+
+	export function asyncTransform<T, U>(operation: AsyncTransformerOperation<T, U>): core.StatelessTransformer<T, U> {
+		return new AsyncTransformer<T, U>(operation);
 	}
 }
 
-streamalicious.streams.fromArray(
+declare function require(name: string): any;
+var request = require('request');
+
+var urlStatusCheckTransform = streamalicious.statelesstransforms.asyncTransform(
+	(url: string, callback: streamalicious.core.Consumer<number>) =>
+		request(url, (error, response, body) => callback(response ? response.statusCode : 42)));
+		
+var test = streamalicious.streams.fromArray(
 	["http://www.google.com",
 		"http://www.yahoo.com",
-		"http://www.aftonbladet.se"]).
-	statelessTransform(new TestTransformer).
+		"http://www.google.com",
+		"http://www.yahoo.com",
+		"http://www.google.com",
+		"http://www.yahoo.com",
+		"http://www.google.com",
+		"http://www.yahoo.com",
+		"http://www.google.com",
+		"http://www.yahoo.com",
+		"http://www.aöskldjföajiowej.se"]).
+	statelessTransform(urlStatusCheckTransform).
 	collect(streamalicious.collectors.toArray(), (result) => {
-	// Counting is done...
-	console.log("Count is: " + result);
+	console.log("Statuses are: " + result);
 });
+
+
+

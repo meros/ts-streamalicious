@@ -317,7 +317,7 @@ module TestBed {
 
     var result2 = sb.fromRange(0, 42)
         .transform((item: number) => { return "" + item; })
-        .collect(cb.createStringJoining(", "));
+        .collect(cb.createArray());
     console.log("Result from range: " + result2);
 
     var result3 = sb.fromRange(1, 1000)
