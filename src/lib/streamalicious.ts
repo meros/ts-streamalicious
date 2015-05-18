@@ -19,6 +19,10 @@ module streamalicious {
 				statelesstransforms.syncTransform(transform),
 				Stream.create);
 		}
+		
+		public flatMap<U>(transform: statelesstransforms.SyncTransformerOperation<T, Stream<U>>) {
+			return null; // TODO
+		}
 
 		public collect<U>(collector: core.Collector<T, U>, callback: core.Consumer<U>) {
 			this.coreStream.coreCollect(collector, callback);

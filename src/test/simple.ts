@@ -41,7 +41,23 @@ describe("Simple test suite", () => {
     }));
 
     it("should match original array squared", function() {
-      expect(result).toEqual([ 1, 4, 9, 16, 25, 36, 49, 64, 81, 100 ]);
+      expect(result).toEqual([1, 4, 9, 16, 25, 36, 49, 64, 81, 100]);
+    });
+  });
+
+  describe("Array of array source and simple transform", () => {
+    var result: number[];
+
+    beforeEach((done) => streamalicious.streams.fromArray([[1, 2], [3], [4, 5, 6, 7], [], [8, 9, 10]]).
+      flatMap<number>((value: number[]) => {
+      return streamalicious.streams.fromArray(value);
+    }).toArray((array) => {
+      result = array;
+      done();
+    }));
+
+    it("should match original array squared", function() {
+      expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     });
   });
 });
