@@ -1,6 +1,8 @@
 var gulp = require('gulp');
 var ts = require('gulp-typescript');
 var bower = require('gulp-bower');
+var uglify = require('gulp-uglify');
+var jasmine = require('gulp-jasmine');
 
 gulp.task('compile-lib', function () {
   var tsResult = gulp.src('src/lib/*.ts')
@@ -12,24 +14,34 @@ gulp.task('compile-lib', function () {
   return tsResult.js.pipe(gulp.dest('bin/lib'));
 });
 
-gulp.task('compile-test', ['bower-test'], function () {
+gulp.task('compress-lib', ['compile-lib'], function() {
+  return gulp.src('bin/lib/streamalicious.js')
+    .pipe(uglify())
+    .pipe(gulp.dest('bin/lib.min'));
+});
+
+gulp.task('compile-tests', function () {
   var tsResult = gulp.src('src/test/*.ts')
     .pipe(ts({
         noImplicitAny: true,
-        out: 'streamalicious.js',
+        out: 'tests.js',
         module: 'amd'
       }));
   return tsResult.js.pipe(gulp.dest('bin/test'));
 });
 
-gulp.task('bower-test', function() {
-  return bower({ directory: 'bin/test/bower_components', cwd: 'src/test' })
-    .pipe(gulp.dest('bin/test/bower_components'));
+gulp.task('run-tests', ['compile-tests', 'compile-lib'], function () {
+    return gulp.src(['bin/lib/streamalicious.js', 'bin/test/tests.js'])
+        .pipe(jasmine());
 });
 
-gulp.task('verify', ['compile-test'], function () {
+gulp.task('verify', ['run-tests'], function () {
 });
 
-gulp.task('watch', ['verify'], function() {
-    gulp.watch('src/*.ts', ['verify']);
+gulp.task('dist', ['verify', 'compress-lib'], function () {
 });
+
+gulp.task('watch', function() {
+    gulp.watch('src/**/*.ts', ['verify']);
+});
+

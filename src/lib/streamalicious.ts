@@ -25,8 +25,12 @@ module streamalicious {
 		}
 		
 		// Utility
-		public toArray<U>(callback: core.Consumer<U[]>) {
-			this.collect(collectors.toArray(), callback);
+		public toArray(callback: core.Consumer<T[]>) {
+			this.collect(collectors.toArray<T>(), callback);
+		}
+		
+		public count(callback: core.Consumer<number>) {
+			this.collect(collectors.toCount(), callback);
 		}
 
 		private static create<U>(streamable: core.Streamable<U>): Stream<U> {
@@ -129,7 +133,7 @@ module streamalicious.statelesstransforms {
 
 	class AsyncTransformer<T, U> implements streamalicious.core.StatelessTransformer<T, U> {
 		private waitingFor: { value: T; done: boolean; }[] = [];
-		private debug = true;
+		private debug = false;
 
 		private operation: AsyncTransformerOperation<T, U>;
 		constructor(operation: AsyncTransformerOperation<T, U>) {
@@ -186,71 +190,3 @@ module streamalicious.statelesstransforms {
 		return new AsyncTransformer<T, U>((value, callback) => callback(transform(value)));
 	}
 }
-
-// Some node specific stuff
-declare function require(name: string): any;
-
-var lineReader = require('line-reader');
-module streamalicious.node.streams {
-	class FileWithLinesStreamable implements core.Streamable<string>{
-		private lr: any;
-
-		private lines: string[] = [];
-		private waitingRequests: core.Consumer<string[]>[] = [];
-		private noMoreLines: boolean = false;
-
-		constructor(filename: string) {
-			lineReader.eachLine(filename, (line: string) => {
-				this.lines.push(line);
-				this.processWaitingRequests();
-			}).then(() => {
-				this.noMoreLines = true;
-				this.processWaitingRequests();
-			});
-		}
-
-		requestPart(callback: core.Consumer<string[]>) {
-			this.waitingRequests.push(callback);
-			this.processWaitingRequests();
-		}
-
-		private processWaitingRequests() {
-			while (this.waitingRequests.length > 0) {
-				if (this.lines.length) {
-					this.waitingRequests.shift()([this.lines.shift()]);
-				} else if (this.noMoreLines) {
-					this.waitingRequests.shift()(null);
-				} else {
-					// No more lines, but also not done. Let those who wait wait some more...
-					break;
-				}
-			}
-		}
-	}
-
-	export function fromFileWithLines(filename: string): Stream<string> {
-		return new Stream(new FileWithLinesStreamable(filename));
-	}
-}
-
-// Async transform from url to url/statuscode (it will normally take some time, and thats the point, it's async)
-var request = require('request');
-
-// Read file (async line by line), request the url and record the status code
-// Note that this test might take several minutes, but thats mostly because some of the hosts do have ping times that are in that range strangely enough
-/*streamalicious.node.streams.fromFileWithLines("placestoping.txt").
-	transform((url: string, callback: streamalicious.core.Consumer<{ url: string, status: number }>) => {
-		request(url, (error, response, body) => {
-			callback({
-				url: url,
-				status: (response ? response.statusCode : 0)
-			});
-		});
-	}).
-	collect(streamalicious.collectors.toArray(), (result: { url: string, status: number }[]) => console.log(result.sort((a, b) => { return a.status - b.status })));
-*/
-streamalicious.node.streams.fromFileWithLines("placestoping.txt").
-	transformSync((test) => { return test + "XX" + test; }).
-	toArray((result: string[]) => console.log(result));
-
-
