@@ -73,6 +73,10 @@ module streamalicious.core {
 		(value: T): void;
 	}
 
+	export interface Mapper<T, U> {
+		(value: T): U;
+	}
+
 	export interface Streamable<T> {
 		requestPart(callback: Consumer<T[]>);
 	}
@@ -112,11 +116,11 @@ module streamalicious.core {
 			this.streamable = streamable;
 		}
 
-		statelessTransform<U>(transformer: StatelessTransformer<T, U>): CoreStream<U> {
-			return new CoreStream<U>(new StatelessTransformingStreamable<T, U>(this.streamable, transformer));
+		public coreStatelessTransform<U, V>(transformer: StatelessTransformer<T, U>, constructor: Mapper<Streamable<U>, V>): V {
+			return constructor(new StatelessTransformingStreamable<T, U>(this.streamable, transformer));
 		}
 
-		collect<U>(collector: Collector<T, U>, callback: Consumer<U>) {
+		public coreCollect<U>(collector: Collector<T, U>, callback: Consumer<U>) {
 			// Bootstrap the collecting
 			this.collectPart({
 				// TODO: need to be able to set max paralell calls from the outside somehow!
@@ -155,9 +159,36 @@ module streamalicious.core {
 }
 
 module streamalicious {
-	export class Stream<T> extends core.CoreStream<T> {
+	export class Stream<T> {
+		private coreStream: core.CoreStream<T>;
 		constructor(streamable: core.Streamable<T>) {
-			super(streamable);
+			this.coreStream = new core.CoreStream(streamable);
+		}
+		
+		// Generic
+		public transform<U>(transform: statelesstransforms.AsyncTransformerOperation<T, U>) {
+			return this.coreStream.coreStatelessTransform(
+				statelesstransforms.asyncTransform(transform),
+				Stream.create);
+		}
+
+		public transformSync<U>(transform: statelesstransforms.SyncTransformerOperation<T, U>) {
+			return this.coreStream.coreStatelessTransform(
+				statelesstransforms.syncTransform(transform),
+				Stream.create);
+		}
+
+		public collect<U>(collector: core.Collector<T, U>, callback: core.Consumer<U>) {
+			this.coreStream.coreCollect(collector, callback);
+		}
+		
+		// Utility
+		public toArray<U>(callback: core.Consumer<U[]>) {
+			this.collect(collectors.toArray(), callback);
+		}
+
+		private static create<U>(streamable: core.Streamable<U>): Stream<U> {
+			return new Stream<U>(streamable);
 		}
 	}
 }
@@ -246,30 +277,12 @@ module streamalicious.collectors {
 }
 
 module streamalicious.statelesstransforms {
-	class StringDuplicationTransform implements core.StatelessTransformer<string, string> {
-		transformPart(part: string[], callback: streamalicious.core.Consumer<string[]>): void {
-			callback(part ? part.map((value) => { return value + value }) : part);
-		}
-	}
-
-	export function stringDuplication(): core.StatelessTransformer<string, string> {
-		return new StringDuplicationTransform;
-	}
-
-	class SleepingNoopTransform<T> implements core.StatelessTransformer<T, T> {
-		transformPart(part: T[], callback: streamalicious.core.Consumer<T[]>): void {
-			setTimeout(() => {
-				callback(part);
-			}, 1000);
-		}
-	}
-
-	export function debugSleepingNoopTransform<T>(): core.StatelessTransformer<T, T> {
-		return new SleepingNoopTransform<T>();
-	}
-
-	interface AsyncTransformerOperation<T, U> {
+	export interface AsyncTransformerOperation<T, U> {
 		(value: T, callback: streamalicious.core.Consumer<U>): void;
+	}
+
+	export interface SyncTransformerOperation<T, U> {
+		(value: T): U;
 	}
 
 	class AsyncTransformer<T, U> implements streamalicious.core.StatelessTransformer<T, U> {
@@ -323,8 +336,12 @@ module streamalicious.statelesstransforms {
 		}
 	}
 
-	export function asyncTransform<T, U>(operation: AsyncTransformerOperation<T, U>): core.StatelessTransformer<T, U> {
-		return new AsyncTransformer<T, U>(operation);
+	export function asyncTransform<T, U>(transform: AsyncTransformerOperation<T, U>): core.StatelessTransformer<T, U> {
+		return new AsyncTransformer<T, U>(transform);
+	}
+
+	export function syncTransform<T, U>(transform: SyncTransformerOperation<T, U>): core.StatelessTransformer<T, U> {
+		return new AsyncTransformer<T, U>((value, callback) => callback(transform(value)));
 	}
 }
 
@@ -369,7 +386,6 @@ module streamalicious.node.streams {
 		}
 	}
 
-
 	export function fromFileWithLines(filename: string): Stream<string> {
 		return new Stream(new FileWithLinesStreamable(filename));
 	}
@@ -377,23 +393,22 @@ module streamalicious.node.streams {
 
 // Async transform from url to url/statuscode (it will normally take some time, and thats the point, it's async)
 var request = require('request');
-var urlStatusCheckTransform = streamalicious.statelesstransforms.asyncTransform(
-	(url: string, callback: streamalicious.core.Consumer<{ url: string, status: number }>) => {
+
+// Read file (async line by line), request the url and record the status code
+// Note that this test might take several minutes, but thats mostly because some of the hosts do have ping times that are in that range strangely enough
+/*streamalicious.node.streams.fromFileWithLines("placestoping.txt").
+	transform((url: string, callback: streamalicious.core.Consumer<{ url: string, status: number }>) => {
 		request(url, (error, response, body) => {
 			callback({
 				url: url,
 				status: (response ? response.statusCode : 0)
 			});
 		});
-	});
-
-// Read file (async line by line), request the url and record the status code
-// Note that this test might take several minutes, but thats mostly because some of the hosts do have ping times that are in that range strangely enough
-streamalicious.node.streams.fromFileWithLines("placestoping.txt").
-// Convert url to url + status code
-	statelessTransform(urlStatusCheckTransform).
-// Collect to array
+	}).
 	collect(streamalicious.collectors.toArray(), (result: { url: string, status: number }[]) => console.log(result.sort((a, b) => { return a.status - b.status })));
-
+*/
+streamalicious.node.streams.fromFileWithLines("placestoping.txt").
+	transformSync((test) => { return test + "XX" + test; }).
+	toArray((result: string[]) => console.log(result));
 
 
