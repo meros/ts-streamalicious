@@ -1,0 +1,30 @@
+{
+  "name": "streamalicious",
+  "version": "0.0.1",
+  "description": "Async first streaming library writter in TypeScript",
+  "main": "streamalicious.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/meros/ts-streamalicious.git"
+  },
+  "keywords": [
+    "TypeScript",
+    "async",
+    "stream",
+    "library"
+  ],
+  "author": "Alexander Schrab",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/meros/ts-streamalicious/issues"
+  },
+  "homepage": "https://github.com/meros/ts-streamalicious",
+  "dependencies": {
+    "gulp": "^3.8.11",
+    "gulp-bower": "0.0.10",
+    "gulp-typescript": "^2.7.4"
+  }
+}

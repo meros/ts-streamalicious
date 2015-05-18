@@ -1,162 +1,4 @@
-module streamalicious.core.asyncqueue {
-	interface AsyncQueueOperation<T> {
-		(callback: Consumer<T>): void;
-	}
-
-	interface AsyncQueueJob<T> {
-		value: T;
-		done: boolean;
-		callback: Consumer<T>;
-	}
-
-	interface AsyncQueueReadyForMoreCallback {
-		(): void;
-	}
-
-	export class AsyncQueue<T> {
-		private maxLength: number;
-		private queue: AsyncQueueJob<T>[] = [];
-		private readyForMore: AsyncQueueReadyForMoreCallback = null;
-
-		constructor(maxLength: number) {
-			this.maxLength = maxLength;
-		}
-
-		private operationDone(job: AsyncQueueJob<T>, value: T) {
-			job.done = true;
-			job.value = value;
-
-			this.updateQueue();
-		}
-
-		private updateQueue() {
-			var readyForMore = this.readyForMore;
-
-			while (this.queue.length) {
-				if (!this.queue[0].done) {
-					break;
-				}
-
-				var job = this.queue.shift();
-				job.callback(job.value);
-			}
-
-			if (this.queue.length < this.maxLength && readyForMore) {
-				this.readyForMore = null;
-				readyForMore();
-			}
-		}
-
-		public push(operation: AsyncQueueOperation<T>, callback: Consumer<T>, readyForMore: AsyncQueueReadyForMoreCallback) {
-			var job: AsyncQueueJob<T> = {
-				value: null,
-				done: false,
-				callback: callback
-			};
-
-			this.queue.push(job);
-			operation((value: T) => {
-				this.operationDone(job, value);
-			});
-
-			if (this.queue.length < this.maxLength) {
-				readyForMore();
-			} else {
-				this.readyForMore = readyForMore;
-			}
-		}
-	}
-}
-
-module streamalicious.core {
-	export interface Consumer<T> {
-		(value: T): void;
-	}
-
-	export interface Mapper<T, U> {
-		(value: T): U;
-	}
-
-	export interface Streamable<T> {
-		requestPart(callback: Consumer<T[]>);
-	}
-
-	export interface CollectorCollectPartResult<T> {
-		done: boolean;
-		value?: T;
-	}
-
-	export interface Collector<T, U> {
-		collectPart(part: T[]): CollectorCollectPartResult<U>;
-	}
-
-	export interface StatelessTransformer<T, U> {
-		transformPart(part: T[], callback: Consumer<U[]>): void;
-	}
-
-	class StatelessTransformingStreamable<T, U> implements Streamable<U>{
-		private transformer: StatelessTransformer<T, U>;
-		private streamable: Streamable<T>;
-		constructor(streamable: Streamable<T>, transformer: StatelessTransformer<T, U>) {
-			this.transformer = transformer;
-			this.streamable = streamable;
-		}
-
-		requestPart(callback: Consumer<U[]>) {
-			this.streamable.requestPart((part: T[]) => {
-				this.transformer.transformPart(part, callback);
-			})
-		}
-	}
-
-	export class CoreStream<T> {
-		private streamable: Streamable<T>
-
-		constructor(streamable: Streamable<T>) {
-			this.streamable = streamable;
-		}
-
-		public coreStatelessTransform<U, V>(transformer: StatelessTransformer<T, U>, constructor: Mapper<Streamable<U>, V>): V {
-			return constructor(new StatelessTransformingStreamable<T, U>(this.streamable, transformer));
-		}
-
-		public coreCollect<U>(collector: Collector<T, U>, callback: Consumer<U>) {
-			// Bootstrap the collecting
-			this.collectPart({
-				// TODO: need to be able to set max paralell calls from the outside somehow!
-				queue: new asyncqueue.AsyncQueue<T[]>(50),
-				collector: collector,
-				callback: callback,
-				done: false
-			});
-		}
-
-		private collectPart<U>(state: { queue: asyncqueue.AsyncQueue<T[]>; collector: Collector<T, U>; callback: Consumer<U>; done: boolean }) {
-			state.queue.push(
-				// Operation to do
-				(callback: Consumer<T[]>) => {
-					this.streamable.requestPart(callback);
-				},
-				// A value is delivered (these are called in order)
-				(part: T[]) => {
-					if (!state.done) {
-						var result = state.collector.collectPart(part);
-						state.done = result.done || !part;
-						if (result.done) {
-							// Since we are done, lets call the initiator of the collection operation
-							state.callback(result.value);
-						}
-					}
-				},
-				// What to do when there is more space in the queue
-				() => {
-					if (!state.done) {
-						this.collectPart(state);
-					}
-				});
-		}
-	}
-}
+/// <reference path="./streamalicious-core.ts" />
 
 module streamalicious {
 	export class Stream<T> {
@@ -286,7 +128,7 @@ module streamalicious.statelesstransforms {
 	}
 
 	class AsyncTransformer<T, U> implements streamalicious.core.StatelessTransformer<T, U> {
-		private waitingFor: { value: T, done: boolean }[] = [];
+		private waitingFor: { value: T; done: boolean; }[] = [];
 		private debug = true;
 
 		private operation: AsyncTransformerOperation<T, U>;
@@ -358,7 +200,7 @@ module streamalicious.node.streams {
 		private noMoreLines: boolean = false;
 
 		constructor(filename: string) {
-			lineReader.eachLine(filename, (line) => {
+			lineReader.eachLine(filename, (line: string) => {
 				this.lines.push(line);
 				this.processWaitingRequests();
 			}).then(() => {
