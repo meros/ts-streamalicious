@@ -12,7 +12,7 @@ module streamalicious {
 			return this.coreStream.coreStatelessTransform(
 				statelesstransforms.asyncTransform(transform),
 				Stream.create);
-		}
+		}		
 
 		public transformSync<U>(transform: statelesstransforms.SyncTransformerOperation<T, U>) {
 			return this.coreStream.coreStatelessTransform(
@@ -20,7 +20,7 @@ module streamalicious {
 				Stream.create);
 		}
 		
-		public flatMap<U>(transform: statelesstransforms.SyncTransformerOperation<T, Stream<U>>) {
+		public flatMap<U>(transform: statelesstransforms.SyncTransformerOperation<T, Stream<U>>) : Stream<U> {
 			return null; // TODO
 		}
 
