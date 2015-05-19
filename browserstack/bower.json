@@ -1,0 +1,19 @@
+{
+  "name": "streamalicious-browserstack",
+  "version": "0.0.1",
+  "homepage": "https://github.com/meros/ts-streamalicious",
+  "authors": [
+    "Alexander Schrab <alexander.schrab@gmail.se>"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jasmine": "~2.3.4"
+  }
+}
