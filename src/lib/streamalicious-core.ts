@@ -54,39 +54,34 @@ module streamalicious.core {
 		}
 
 		public coreCollect<U>(collector: Collector<T, U>, callback: Consumer<U>) {
-			// Bootstrap the collecting
-			this.collectPart({
-				// TODO: need to be able to set max paralell calls from the outside somehow!
-				queue: new asyncqueue.AsyncQueue<T[]>(50),
-				collector: collector,
-				callback: callback,
-				done: false
+			var done: boolean = false;
+			var queue = new asyncqueue.AsyncQueue<T[]>(50, () => {
+				if (!done) {
+					collectOne();
+				}
 			});
+			var collectOne = () => {
+				queue.push(
+					// Operation to do
+					(callback: Consumer<T[]>) => {
+						this.streamable.requestPart(callback);
+					},
+					// A value is delivered (these are called in order)
+					(part: T[]) => {
+						if (!done) {
+							var result = collector.collectPart(part);
+							done = result.done || !part;
+							if (done) {
+								// Since we are done, lets call the initiator of the collection operation
+								callback(result.value);
+							}
+						}
+					});
+			};
+			
+			// Boot strap collecting
+			collectOne();
 		}
 
-		private collectPart<U>(state: { queue: asyncqueue.AsyncQueue<T[]>; collector: Collector<T, U>; callback: Consumer<U>; done: boolean }) {
-			state.queue.push(
-				// Operation to do
-				(callback: Consumer<T[]>) => {
-					this.streamable.requestPart(callback);
-				},
-				// A value is delivered (these are called in order)
-				(part: T[]) => {
-					if (!state.done) {
-						var result = state.collector.collectPart(part);
-						state.done = result.done || !part;
-						if (result.done) {
-							// Since we are done, lets call the initiator of the collection operation
-							state.callback(result.value);
-						}
-					}
-				},
-				// What to do when there is more space in the queue
-				() => {
-					if (!state.done) {
-						this.collectPart(state);
-					}
-				});
-		}
 	}
 }

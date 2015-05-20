@@ -13,41 +13,21 @@ module streamalicious.core.asyncqueue {
 		(): void;
 	}
 
+	// This class is mostly used to initiate multiple getPart requests upstream (remember we don't know how many parts there are)
+	// but always deliver the result in order. It's good for collecting results that can run in parallell but by nature takes some time to compute/look up.
 	export class AsyncQueue<T> {
 		private maxLength: number;
 		private queue: AsyncQueueJob<T>[] = [];
-		private readyForMore: AsyncQueueReadyForMoreCallback = null;
+		private onReadyForMore: AsyncQueueReadyForMoreCallback;
 
-		constructor(maxLength: number) {
+		constructor(maxLength: number, readyForMore: AsyncQueueReadyForMoreCallback) {
 			this.maxLength = maxLength;
+			this.onReadyForMore = readyForMore;
 		}
 
-		private operationDone(job: AsyncQueueJob<T>, value: T) {
-			job.done = true;
-			job.value = value;
-
-			this.updateQueue();
-		}
-
-		private updateQueue() {
-			var readyForMore = this.readyForMore;
-
-			while (this.queue.length) {
-				if (!this.queue[0].done) {
-					break;
-				}
-
-				var job = this.queue.shift();
-				job.callback(job.value);
-			}
-
-			if (this.queue.length < this.maxLength && readyForMore) {
-				this.readyForMore = null;
-				readyForMore();
-			}
-		}
-
-		public push(operation: AsyncQueueOperation<T>, callback: Consumer<T>, readyForMore: AsyncQueueReadyForMoreCallback) {
+		// Push another operation on the queue, callback is called (in strict order of calling this function) when results
+		// are in, readyForMore is called when there are less than maxLength outstanding operations (and queue can start more)
+		public push(operation: AsyncQueueOperation<T>, callback: Consumer<T>) {
 			var job: AsyncQueueJob<T> = {
 				value: null,
 				done: false,
@@ -60,9 +40,29 @@ module streamalicious.core.asyncqueue {
 			});
 
 			if (this.queue.length < this.maxLength) {
-				readyForMore();
-			} else {
-				this.readyForMore = readyForMore;
+				this.onReadyForMore();
+			}
+		}
+
+		private operationDone(job: AsyncQueueJob<T>, value: T) {
+			job.done = true;
+			job.value = value;
+
+			this.updateQueue();
+		}
+
+		private updateQueue() {
+			while (this.queue.length) {
+				if (!this.queue[0].done) {
+					break;
+				}
+
+				var job = this.queue.shift();
+				job.callback(job.value);
+			}
+
+			if (this.queue.length < this.maxLength) {
+				this.onReadyForMore();
 			}
 		}
 	}
