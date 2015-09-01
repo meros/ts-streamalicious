@@ -7,9 +7,9 @@ describe("Simple test suite", () => {
 
     beforeEach((done) => streamalicious.streams.fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).
       toArray((array) => {
-      result = array;
-      done();
-    }));
+        result = array;
+        done();
+      }));
 
     it("should match original array", function() {
       expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
@@ -21,11 +21,11 @@ describe("Simple test suite", () => {
 
     beforeEach((done) => streamalicious.streams.fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).
       count((count) => {
-      result = count;
-      done();
-    }));
+        result = count;
+        done();
+      }));
 
-    it("should match original array", function() {
+    it("should match count of original array", function() {
       expect(result).toEqual(10);
     });
   });
@@ -34,61 +34,77 @@ describe("Simple test suite", () => {
     var result: number[];
 
     beforeEach((done) => streamalicious.streams.fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).
-      transform((val: number, callback : streamalicious.core.Consumer<number>) => callback(val * val)).
+      transform((val: number, callback: streamalicious.core.Consumer<number>) => callback(val * val)).
       toArray((array) => {
-      result = array;
-      done();
-    }));
+        result = array;
+        done();
+      }));
 
     it("should match original array squared", function() {
       expect(result).toEqual([1, 4, 9, 16, 25, 36, 49, 64, 81, 100]);
     });
   });
-  
-   describe("Array source and simple transform - sync", () => {
+
+  describe("Array source and simple transform - sync", () => {
     var result: number[];
 
     beforeEach((done) => streamalicious.streams.fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).
       transformSync((val) => { return val * val; }).
       toArray((array) => {
-      result = array;
-      done();
-    }));
+        result = array;
+        done();
+      }));
 
     it("should match original array squared", function() {
       expect(result).toEqual([1, 4, 9, 16, 25, 36, 49, 64, 81, 100]);
     });
   });
 
-  describe("Array of array source and simple transform - async", () => {
+  describe("Array of array source and flatmap - async", () => {
     var result: number[];
 
     beforeEach((done) => streamalicious.streams.fromArray([[1, 2], [3], [4, 5, 6, 7], [], [8, 9, 10]]).
       flatMap<number>((value: number[], callback: streamalicious.core.Consumer<streamalicious.Stream<number>>) => {
-      callback(streamalicious.streams.fromArray(value));
-    }).toArray((array) => {
-      result = array;
-      done();
-    }));
+        callback(streamalicious.streams.fromArray(value));
+      }).toArray((array) => {
+        result = array;
+        done();
+      }));
 
-    it("should match original array squared", function() {
+    it("should match original array flatmapped", function() {
       expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     });
   });
-  
-    describe("Array of array source and simple transform - sync", () => {
+
+  describe("Array of array source and flatmap - sync", () => {
     var result: number[];
 
     beforeEach((done) => streamalicious.streams.fromArray([[1, 2], [3], [4, 5, 6, 7], [], [8, 9, 10]]).
       flatMapSync<number>((value: number[]) => {
-      return streamalicious.streams.fromArray(value);
-    }).toArray((array) => {
-      result = array;
-      done();
-    }));
+        return streamalicious.streams.fromArray(value);
+      }).toArray((array) => {
+        result = array;
+        done();
+      }));
+
+    it("should match original array flatmapped", function() {
+      expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    });
+  });
+
+  describe("Array of array source and string joining collector", () => {
+    var result: string;
+
+    beforeEach((done) => streamalicious.streams.fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).
+      transform((value: number, callback: streamalicious.core.Consumer<string>) => {
+        callback(value.toString());
+      }).collect(streamalicious.collectors.toJointString(", "), (jointString: string) => {
+        result = jointString;
+        done();
+      }));
 
     it("should match original array squared", function() {
-      expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(result).toEqual("1, 2, 3, 4, 5, 6, 7, 8, 9, 10");
     });
   });
 });

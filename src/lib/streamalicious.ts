@@ -25,7 +25,7 @@ module streamalicious {
 				statelesstransforms.asyncFlatMap(transform),
 				Stream.create);
 		}
-		
+
 		public flatMapSync<U>(transform: statelesstransforms.SyncTransformerOperation<T, Stream<U>>): Stream<U> {
 			return this.coreStream.coreStatelessTransform(
 				statelesstransforms.syncFlatMap(transform),
@@ -126,12 +126,46 @@ module streamalicious.collectors {
 		}
 	}
 
+	class JoiningCollector implements streamalicious.core.Collector<string, string> {
+		private seperator: string;
+		private result: string;
+
+		public collectPart(part: string[]): streamalicious.core.CollectorCollectPartResult<string> {
+			if (!part) {
+				// I am done...
+				return { done: true, value: this.result };
+			}
+
+			var partLength = part.length;
+			for (var i = 0; i < partLength; i++) {
+				let subPart = part[i];
+				// Add to result array and keep going
+				if (!!this.result) {
+					this.result += this.seperator + subPart;
+				} else {
+					this.result = subPart;
+				}
+			}
+
+			return { done: false };
+		}
+
+		constructor(seperator: string) {
+			this.seperator = seperator;
+			this.result = "";
+		}
+	}
+
 	export function toCount<T>() {
 		return new CountCollector<T>();
 	}
 
 	export function toArray<T>() {
 		return new ArrayCollector<T>();
+	}
+
+	export function toJointString(seperator: string) {
+		return new JoiningCollector(seperator);
 	}
 }
 
@@ -208,8 +242,8 @@ module streamalicious.statelesstransforms {
 					(stream: Stream<U>) =>
 						stream.toArray(callback)));
 	}
-	
-		export function syncFlatMap<T, U>(transform: SyncTransformerOperation<T, Stream<U>>): core.StatelessTransformer<T, U> {
+
+	export function syncFlatMap<T, U>(transform: SyncTransformerOperation<T, Stream<U>>): core.StatelessTransformer<T, U> {
 		// This implementation has the same problem as Java flatmap, it unpacks the entire stream forcefullly. 
 		// This has performance impacts on limited streams and hangs on unlimited streams. The cost of doing better is a little high right now though and this is good enough for most cases 
 		return new AsyncTransformer<T, U>(
