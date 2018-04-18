@@ -13,30 +13,25 @@ export default class AsyncTransformer<T, U>
   }
 
   transformPart(part: T[], callback: types.Consumer<U[]>): void {
+    // Null part, just pass through
     if (!part) {
       callback(null);
-    } else {
-      var count = part.length;
-      var result: U[][] = [];
-      var flattenedResult: U[] = [];
-      for (var i = 0, len = part.length; i < len; i++) {
-        ((myIndex: number) => {
-          this.operation(part[myIndex], (value: U[]) => {
-            result[myIndex] = value;
-            count--;
-            if (count === 0) {
-              // Flatten result
-              for (var i = 0, len = result.length; i < len; i++) {
-                for (var j = 0, lenj = result[i].length; j < lenj; j++) {
-                  flattenedResult.push(result[i][j]);
-                }
-              }
-
-              callback(flattenedResult);
-            }
-          });
-        })(i);
-      }
+      return;
     }
+
+    // Map items of part to promises
+    Promise.all<U[]>(
+      part.map(
+        (item: T) =>
+          new Promise(resolve => {
+            this.operation(item, (transformedItem: U[]) => {
+              resolve(transformedItem);
+            });
+          })
+      )
+    ).then((result: U[][]) => {
+      // Flatten result
+      callback([].concat(...result));
+    });
   }
 }

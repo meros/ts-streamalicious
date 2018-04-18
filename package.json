@@ -4,7 +4,7 @@
   "description": "Async first streaming library writter in TypeScript",
   "main": "lib/streamalicious.js",
   "scripts": {
-    "build": "tsc src/*.ts src/**/*.ts --outDir lib/",
+    "build": "tsc",
     "test": "yarn build && jasmine JASMINE_CONFIG_PATH=jasmine.json"
   },
   "repository": {
