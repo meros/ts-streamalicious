@@ -1,4 +1,4 @@
-import * as types from "./types";
+import * as types from "../types";
 
 interface AsyncQueueOperation<T> {
   (callback: types.Consumer<T>): void;
@@ -18,7 +18,7 @@ interface AsyncQueueReadyForMoreCallback {
 // (remember we don't know how many parts there are) but always deliver the
 // result in order. It's good for collecting results that can run in parallell
 // but by nature takes some time to compute/look up.
-export class AsyncQueue<T> {
+export default class AsyncQueue<T> {
   private maxLength: number;
   private queue: AsyncQueueJob<T>[] = [];
   private onReadyForMore: AsyncQueueReadyForMoreCallback;

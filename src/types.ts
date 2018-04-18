@@ -23,4 +23,10 @@ export interface StatelessTransformer<T, U> {
   transformPart(part: T[], callback: Consumer<U[]>): void;
 }
 
-export const dummy = {};
+export interface AsyncTransformerOperation<T, U> {
+  (value: T, callback: Consumer<U>): void;
+}
+
+export interface SyncTransformerOperation<T, U> {
+  (value: T): U;
+}

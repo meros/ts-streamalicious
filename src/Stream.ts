@@ -10,18 +10,14 @@ export default class Stream<T> {
   }
 
   // Generic
-  public transform<U>(
-    transform: statelesstransforms.AsyncTransformerOperation<T, U>
-  ) {
+  public transform<U>(transform: types.AsyncTransformerOperation<T, U>) {
     return this.coreStream.coreStatelessTransform(
       statelesstransforms.asyncTransform(transform),
       Stream.create
     );
   }
 
-  public transformSync<U>(
-    transform: statelesstransforms.SyncTransformerOperation<T, U>
-  ) {
+  public transformSync<U>(transform: types.SyncTransformerOperation<T, U>) {
     return this.coreStream.coreStatelessTransform(
       statelesstransforms.syncTransform(transform),
       Stream.create
@@ -29,7 +25,7 @@ export default class Stream<T> {
   }
 
   public flatMap<U>(
-    transform: statelesstransforms.AsyncTransformerOperation<T, Stream<U>>
+    transform: types.AsyncTransformerOperation<T, Stream<U>>
   ): Stream<U> {
     return this.coreStream.coreStatelessTransform(
       statelesstransforms.asyncFlatMap(transform),
@@ -38,7 +34,7 @@ export default class Stream<T> {
   }
 
   public flatMapSync<U>(
-    transform: statelesstransforms.SyncTransformerOperation<T, Stream<U>>
+    transform: types.SyncTransformerOperation<T, Stream<U>>
   ): Stream<U> {
     return this.coreStream.coreStatelessTransform(
       statelesstransforms.syncFlatMap(transform),

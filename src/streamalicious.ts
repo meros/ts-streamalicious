@@ -1,8 +1,9 @@
-import * as _streams from "./streamalicious/streams";
-import * as _types from "./streamalicious/types";
-import * as _collectors from "./streamalicious/collectors";
-export { default as Stream } from "./streamalicious/Stream";
+import * as _types from "./types";
 
-export import streams = _streams;
+import * as _streamables from "./streamables";
+import * as _collectors from "./collectors";
+export { default as Stream } from "./Stream";
+
+export import streamables = _streamables;
 export import types = _types;
 export import collectors = _collectors;
