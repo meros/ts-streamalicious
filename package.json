@@ -1,35 +1,27 @@
 {
-  "name": "streamalicious",
+  "name": "@meros/streamalicious",
   "version": "0.0.1",
   "description": "Async first streaming library writter in TypeScript",
-  "main": "streamalicious.js",
+  "main": "lib/streamalicious.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc src/*.ts src/**/*.ts --outDir lib/",
+    "test": "yarn build && jasmine JASMINE_CONFIG_PATH=jasmine.json"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/meros/ts-streamalicious.git"
   },
-  "keywords": [
-    "TypeScript",
-    "async",
-    "stream",
-    "library"
-  ],
+  "keywords": ["TypeScript", "async", "stream", "library"],
   "author": "Alexander Schrab",
   "license": "ISC",
   "bugs": {
     "url": "https://github.com/meros/ts-streamalicious/issues"
   },
   "homepage": "https://github.com/meros/ts-streamalicious",
-  "dependencies": {
-    "gulp": "^3.8.11",
-    "gulp-bower": "0.0.10",
-    "gulp-jasmine": "^2.0.1",
-    "gulp-typescript": "^2.7.4",
-    "gulp-uglify": "^1.2.0",
-    "gulp-watch": "^4.2.4",
-    "browserstack-runner": "~0.3.1",
-    "gulp-coverage": "~0.3.35"
+  "devDependencies": {
+    "@types/jasmine": "^2.8.6",
+    "jasmine": "^3.1.0",
+    "prettier-cli": "^0.1.0",
+    "typescript": "^2.8.1"
   }
 }
