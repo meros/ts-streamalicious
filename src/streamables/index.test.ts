@@ -1,5 +1,4 @@
 import * as streams from ".";
-import ArrayStreamable from "./ArrayStreamable";
 import Stream from "../Stream";
 
 test("ArrayStreamable", () => {

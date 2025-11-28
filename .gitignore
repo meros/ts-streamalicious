@@ -1,4 +1,24 @@
+# Build output
 lib/
+
+# Dependencies
 node_modules/
+
+# Test coverage
 coverage/
+
+# Logs
 yarn-error.log
+*.log
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Generated playground bundle (built during deploy)
+playground/streamalicious.bundle.js

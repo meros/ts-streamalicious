@@ -24,28 +24,21 @@ export default class Stream<T> {
     );
   }
 
-  public flatMap<U>(
-    transform: types.AsyncTransformerOperation<T, Stream<U>>
-  ): Stream<U> {
+  public flatMap<U>(transform: types.AsyncTransformerOperation<T, Stream<U>>): Stream<U> {
     return this.coreStream.coreStatelessTransform(
       statelesstransforms.asyncFlatMap(transform),
       Stream.create
     );
   }
 
-  public flatMapSync<U>(
-    transform: types.SyncTransformerOperation<T, Stream<U>>
-  ): Stream<U> {
+  public flatMapSync<U>(transform: types.SyncTransformerOperation<T, Stream<U>>): Stream<U> {
     return this.coreStream.coreStatelessTransform(
       statelesstransforms.syncFlatMap(transform),
       Stream.create
     );
   }
 
-  public collect<U>(
-    collector: types.Collector<T, U>,
-    callback: types.Consumer<U>
-  ) {
+  public collect<U>(collector: types.Collector<T, U>, callback: types.Consumer<U>) {
     this.coreStream.coreCollect(collector, callback);
   }
 

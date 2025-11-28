@@ -7,10 +7,10 @@ test("simple", () => {
 
   const statelessTransformingStreamable = new StatelessTransformingStreamable(
     arrayStreamable,
-    statelesstransforms.syncTransform(n => -n)
+    statelesstransforms.syncTransform((n) => -n)
   );
 
-  statelessTransformingStreamable.requestPart(result => {
+  statelessTransformingStreamable.requestPart((result) => {
     expect(result).toEqual([-1, -2, -3, -4, -5]);
   });
 });

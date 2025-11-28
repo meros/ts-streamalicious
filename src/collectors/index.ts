@@ -1,4 +1,3 @@
-import * as types from "../types";
 import ArrayCollector from "./ArrayCollector";
 import CountCollector from "./CountCollector";
 import JoiningCollector from "./JoiningCollector";

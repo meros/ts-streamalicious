@@ -1,17 +1,28 @@
 {
   "name": "@meros/streamalicious",
   "version": "0.0.1",
-  "description": "Async first streaming library writter in TypeScript",
+  "description": "Async first streaming library written in TypeScript",
   "main": "lib/streamalicious.js",
+  "types": "lib/streamalicious.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "yarn build && jasmine JASMINE_CONFIG_PATH=jasmine.json"
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "playground:build": "npm run build && node scripts/build-playground.js",
+    "playground:dev": "npm run playground:build && npx http-server playground -o"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/meros/ts-streamalicious.git"
   },
-  "keywords": ["TypeScript", "async", "stream", "library"],
+  "keywords": [
+    "TypeScript",
+    "async",
+    "stream",
+    "library"
+  ],
   "author": "Alexander Schrab",
   "license": "ISC",
   "bugs": {
@@ -19,13 +30,28 @@
   },
   "homepage": "https://github.com/meros/ts-streamalicious",
   "devDependencies": {
-    "@types/jest": "^22.2.3",
-    "jest": "^22.4.3",
-    "prettier-cli": "^0.1.0",
-    "typescript": "^2.8.1"
+    "@types/jest": "^29.5.11",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "esbuild": "^0.19.10",
+    "eslint": "^8.56.0",
+    "http-server": "^14.1.1",
+    "jest": "^29.7.0",
+    "prettier": "^3.7.1",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.3.3"
   },
   "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
     "collectCoverage": true,
-    "testRegex": "lib/.*\\.test\\.js"
+    "testMatch": [
+      "**/src/**/*.test.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov"
+    ]
   }
 }

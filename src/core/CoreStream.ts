@@ -14,35 +14,29 @@ export default class CoreStream<T> {
     constructor: types.Mapper<types.Streamable<U>, V>
   ): V {
     return constructor(
-      new streamables.StatelessTransformingStreamable<T, U>(
-        this.streamable,
-        transformer
-      )
+      new streamables.StatelessTransformingStreamable<T, U>(this.streamable, transformer)
     );
   }
 
-  public coreCollect<U>(
-    collector: types.Collector<T, U>,
-    callback: types.Consumer<U>
-  ) {
-    var done: boolean = false;
-    var queue = new AsyncQueue<T[]>(50, () => {
+  public coreCollect<U>(collector: types.Collector<T, U>, callback: types.Consumer<U>) {
+    let done: boolean = false;
+    const queue = new AsyncQueue<T[] | null>(50, () => {
       if (!done) {
         collectOne();
       }
     });
-    var collectOne = () => {
+    const collectOne = () => {
       queue.push(
         // Operation to do
-        (callback: types.Consumer<T[]>) => {
-          this.streamable.requestPart(callback);
+        (cb: types.Consumer<T[] | null>) => {
+          this.streamable.requestPart(cb);
         },
         // A value is delivered (these are called in order)
-        (part: T[]) => {
+        (part: T[] | null) => {
           if (!done) {
-            var result = collector.collectPart(part);
+            const result = collector.collectPart(part);
             done = result.done || !part;
-            if (done) {
+            if (done && result.value !== undefined) {
               // Since we are done, lets call the initiator of the collection operation
               callback(result.value);
             }

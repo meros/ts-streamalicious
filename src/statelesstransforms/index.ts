@@ -15,9 +15,7 @@ export function asyncTransform<T, U>(
 export function syncTransform<T, U>(
   transform: types.SyncTransformerOperation<T, U>
 ): types.StatelessTransformer<T, U> {
-  return new AsyncTransformer<T, U>((value, callback) =>
-    callback([transform(value)])
-  );
+  return new AsyncTransformer<T, U>((value, callback) => callback([transform(value)]));
 }
 
 export function asyncFlatMap<T, U>(

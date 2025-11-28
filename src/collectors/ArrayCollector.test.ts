@@ -6,7 +6,7 @@ test("simple", () => {
   expect(arrayCollector.collectPart([4, 5, 6])).toEqual({ done: false });
   expect(arrayCollector.collectPart(null)).toEqual({
     done: true,
-    value: [1, 2, 3, 4, 5, 6]
+    value: [1, 2, 3, 4, 5, 6],
   });
 });
 
@@ -14,7 +14,7 @@ test("empty", () => {
   const arrayCollector = new ArrayCollector<number>();
   expect(arrayCollector.collectPart(null)).toEqual({
     done: true,
-    value: []
+    value: [],
   });
 });
 
@@ -23,6 +23,6 @@ test("emptyparts", () => {
   expect(arrayCollector.collectPart([])).toEqual({ done: false });
   expect(arrayCollector.collectPart(null)).toEqual({
     done: true,
-    value: []
+    value: [],
   });
 });

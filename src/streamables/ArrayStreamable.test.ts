@@ -1,27 +1,27 @@
 import ArrayStreamable from "./ArrayStreamable";
 
-test("simple", done => {
+test("simple", (done) => {
   const arrayStreamable = new ArrayStreamable<number>([1, 2, 3, 4, 5, 6]);
-  arrayStreamable.requestPart(result => {
+  arrayStreamable.requestPart((result) => {
     expect(result).toEqual([1, 2, 3, 4, 5, 6]);
     done();
   });
 });
 
-test("exhaust", done => {
+test("exhaust", (done) => {
   const arrayStreamable = new ArrayStreamable<number>([1, 2, 3, 4, 5, 6]);
-  arrayStreamable.requestPart(result => {
+  arrayStreamable.requestPart((result) => {
     expect(result).toEqual([1, 2, 3, 4, 5, 6]);
-    arrayStreamable.requestPart(result => {
+    arrayStreamable.requestPart((result) => {
       expect(result).toEqual(null);
       done();
     });
   });
 });
 
-test("empty", done => {
+test("empty", (done) => {
   const arrayStreamable = new ArrayStreamable<number>(null);
-  arrayStreamable.requestPart(result => {
+  arrayStreamable.requestPart((result) => {
     expect(result).toEqual(null);
     done();
   });
