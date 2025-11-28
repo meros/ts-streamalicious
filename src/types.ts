@@ -7,7 +7,7 @@ export interface Mapper<T, U> {
 }
 
 export interface Streamable<T> {
-  requestPart(callback: Consumer<T[]>): void;
+  requestPart(callback: Consumer<T[] | null>): void;
 }
 
 export interface CollectorCollectPartResult<T> {
@@ -16,11 +16,11 @@ export interface CollectorCollectPartResult<T> {
 }
 
 export interface Collector<T, U> {
-  collectPart(part: T[]): CollectorCollectPartResult<U>;
+  collectPart(part: T[] | null): CollectorCollectPartResult<U>;
 }
 
 export interface StatelessTransformer<T, U> {
-  transformPart(part: T[], callback: Consumer<U[]>): void;
+  transformPart(part: T[] | null, callback: Consumer<U[] | null>): void;
 }
 
 export interface AsyncTransformerOperation<T, U> {

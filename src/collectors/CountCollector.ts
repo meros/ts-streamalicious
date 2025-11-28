@@ -3,7 +3,7 @@ import * as types from "../types";
 export default class CountCollector<T> implements types.Collector<T, number> {
   private count: number = 0;
 
-  public collectPart(part: T[]): types.CollectorCollectPartResult<number> {
+  public collectPart(part: T[] | null): types.CollectorCollectPartResult<number> {
     if (!part) {
       // I am done...
       return { done: true, value: this.count };

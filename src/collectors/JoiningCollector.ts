@@ -1,21 +1,20 @@
 import * as types from "../types";
 
-export default class JoiningCollector
-  implements types.Collector<string, string> {
+export default class JoiningCollector implements types.Collector<string, string> {
   private seperator: string;
   private result: string;
 
-  public collectPart(part: string[]): types.CollectorCollectPartResult<string> {
+  public collectPart(part: string[] | null): types.CollectorCollectPartResult<string> {
     if (!part) {
       // I am done...
       return { done: true, value: this.result };
     }
 
-    var partLength = part.length;
-    for (var i = 0; i < partLength; i++) {
-      let subPart = part[i];
+    const partLength = part.length;
+    for (let i = 0; i < partLength; i++) {
+      const subPart = part[i];
       // Add to result array and keep going
-      if (!!this.result) {
+      if (this.result) {
         this.result += this.seperator + subPart;
       } else {
         this.result = subPart;

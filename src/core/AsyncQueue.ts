@@ -5,7 +5,7 @@ interface AsyncQueueOperation<T> {
 }
 
 interface AsyncQueueJob<T> {
-  value: T;
+  value: T | null;
   done: boolean;
   callback: types.Consumer<T>;
 }
@@ -33,10 +33,10 @@ export default class AsyncQueue<T> {
   // when there are less than maxLength outstanding operations (and queue can
   // start more)
   public push(operation: AsyncQueueOperation<T>, callback: types.Consumer<T>) {
-    var job: AsyncQueueJob<T> = {
+    const job: AsyncQueueJob<T> = {
       value: null,
       done: false,
-      callback: callback
+      callback: callback,
     };
 
     this.queue.push(job);
@@ -62,8 +62,10 @@ export default class AsyncQueue<T> {
         break;
       }
 
-      var job = this.queue.shift();
-      job.callback(job.value);
+      const job = this.queue.shift();
+      if (job) {
+        job.callback(job.value as T);
+      }
     }
 
     if (this.queue.length < this.maxLength) {

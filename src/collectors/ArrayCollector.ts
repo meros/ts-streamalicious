@@ -3,7 +3,7 @@ import * as types from "../types";
 export default class ArrayCollector<T> implements types.Collector<T, T[]> {
   private result: T[] = [];
 
-  public collectPart(part: T[]): types.CollectorCollectPartResult<T[]> {
+  public collectPart(part: T[] | null): types.CollectorCollectPartResult<T[]> {
     if (!part) {
       // I am done...
       return { done: true, value: this.result };
