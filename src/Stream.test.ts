@@ -81,4 +81,18 @@ describe("Stream class", () => {
         done();
       });
   });
+
+  test("count returns 0 for empty stream", (done) => {
+    streamables.fromArray<number>([]).count((count) => {
+      expect(count).toBe(0);
+      done();
+    });
+  });
+
+  test("joining empty stream returns empty string", (done) => {
+    streamables.fromArray<string>([]).collect(collectors.toJointString(","), (result) => {
+      expect(result).toBe("");
+      done();
+    });
+  });
 });
