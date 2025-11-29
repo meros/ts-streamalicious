@@ -12,4 +12,11 @@ export default class ArrayStreamable<T> implements types.Streamable<T> {
     this.array = null;
     callback(array);
   }
+
+  public requestPartCount(callback: types.Consumer<number | null>): void {
+    const array = this.array;
+    this.array = null;
+    // Return just the count instead of actual values
+    callback(array === null ? null : array.length);
+  }
 }

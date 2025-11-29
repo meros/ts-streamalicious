@@ -515,4 +515,117 @@ describe("Stream class", () => {
       });
     });
   });
+
+  // ==========================================
+  // Pull-based optimization tests
+  // ==========================================
+
+  describe("Pull-based optimization", () => {
+    test("count() skips expensive transforms when collector doesn't need values", async () => {
+      let transformCallCount = 0;
+
+      // This test verifies that when using count(), expensive transforms are skipped
+      // because CountCollector has needsValues: false
+      const count = await streamables
+        .fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        .transformSync((x) => {
+          transformCallCount++;
+          return x * 2;
+        })
+        .count();
+
+      expect(count).toBe(10);
+      // The transform should NOT be called because count() uses optimized path
+      expect(transformCallCount).toBe(0);
+    });
+
+    test("toArray() still executes transforms when collector needs values", async () => {
+      let transformCallCount = 0;
+
+      const result = await streamables
+        .fromArray([1, 2, 3, 4, 5])
+        .transformSync((x) => {
+          transformCallCount++;
+          return x * 2;
+        })
+        .toArray();
+
+      expect(result).toEqual([2, 4, 6, 8, 10]);
+      // The transform should be called because toArray() needs actual values
+      expect(transformCallCount).toBe(5);
+    });
+
+    test("count with async transforms also skips expensive operations", async () => {
+      let transformCallCount = 0;
+
+      const count = await streamables
+        .fromArray([1, 2, 3, 4, 5])
+        .transform<number>(async (x) => {
+          transformCallCount++;
+          return x * 2;
+        })
+        .count();
+
+      expect(count).toBe(5);
+      // The transform should NOT be called because count() uses optimized path
+      expect(transformCallCount).toBe(0);
+    });
+
+    test("collector hints are respected for different collectors", async () => {
+      // CountCollector: needsValues: false
+      expect(collectors.toCount<number>().getHints?.()).toEqual({
+        needsValues: false,
+        needsOrdering: false,
+      });
+
+      // ArrayCollector: needsValues: true
+      expect(collectors.toArray<number>().getHints?.()).toEqual({
+        needsValues: true,
+        needsOrdering: true,
+      });
+
+      // JoiningCollector: needsValues: true
+      expect(collectors.toJointString(",").getHints?.()).toEqual({
+        needsValues: true,
+        needsOrdering: true,
+      });
+    });
+
+    test("chained transforms are all skipped when counting", async () => {
+      let transform1CallCount = 0;
+      let transform2CallCount = 0;
+
+      const count = await streamables
+        .fromArray([1, 2, 3])
+        .transformSync((x) => {
+          transform1CallCount++;
+          return x * 2;
+        })
+        .transformSync((x) => {
+          transform2CallCount++;
+          return x.toString();
+        })
+        .count();
+
+      expect(count).toBe(3);
+      // Neither transform should be called
+      expect(transform1CallCount).toBe(0);
+      expect(transform2CallCount).toBe(0);
+    });
+
+    test("count on empty stream with optimization", async () => {
+      let transformCallCount = 0;
+
+      const count = await streamables
+        .fromArray<number>([])
+        .transformSync((x) => {
+          transformCallCount++;
+          return x * 2;
+        })
+        .count();
+
+      expect(count).toBe(0);
+      expect(transformCallCount).toBe(0);
+    });
+  });
 });

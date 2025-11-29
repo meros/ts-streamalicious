@@ -28,3 +28,10 @@ test("multiple strings in one part", () => {
     value: "Hello World",
   });
 });
+
+test("getHints returns needsValues: true and needsOrdering: true", () => {
+  const joiningCollector = new JoiningCollector(" ");
+  const hints = joiningCollector.getHints();
+  expect(hints.needsValues).toBe(true);
+  expect(hints.needsOrdering).toBe(true);
+});

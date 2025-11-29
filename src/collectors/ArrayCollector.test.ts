@@ -26,3 +26,10 @@ test("emptyparts", () => {
     value: [],
   });
 });
+
+test("getHints returns needsValues: true and needsOrdering: true", () => {
+  const arrayCollector = new ArrayCollector<number>();
+  const hints = arrayCollector.getHints();
+  expect(hints.needsValues).toBe(true);
+  expect(hints.needsOrdering).toBe(true);
+});

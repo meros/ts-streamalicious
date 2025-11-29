@@ -13,4 +13,12 @@ export default class CountCollector<T> implements types.Collector<T, number> {
     this.count += part.length;
     return { done: false };
   }
+
+  public getHints(): types.CollectorHints {
+    // CountCollector doesn't need actual values or ordering - just counts
+    return {
+      needsValues: false,
+      needsOrdering: false,
+    };
+  }
 }

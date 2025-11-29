@@ -24,6 +24,13 @@ export default class JoiningCollector implements types.Collector<string, string>
     return { done: false };
   }
 
+  public getHints(): types.CollectorHints {
+    return {
+      needsValues: true,
+      needsOrdering: true,
+    };
+  }
+
   constructor(seperator: string) {
     this.seperator = seperator;
     this.result = "";

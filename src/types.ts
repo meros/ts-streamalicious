@@ -8,6 +8,13 @@ export interface Mapper<T, U> {
 
 export interface Streamable<T> {
   requestPart(callback: Consumer<T[] | null>): void;
+
+  /**
+   * Optional method to request only the count of elements in a part.
+   * Used for pull-based optimization when a collector doesn't need actual values.
+   * If not implemented, falls back to requestPart and counts the results.
+   */
+  requestPartCount?(callback: Consumer<number | null>): void;
 }
 
 export interface CollectorCollectPartResult<T> {
@@ -15,8 +22,35 @@ export interface CollectorCollectPartResult<T> {
   value?: T;
 }
 
+/**
+ * Hints about what information a collector needs to compute its result.
+ * Used to optimize stream processing by skipping unnecessary work.
+ */
+export interface CollectorHints {
+  /**
+   * Whether the collector needs the actual values of the elements.
+   * If false, the stream may skip computing actual values and only track counts.
+   * Default is true if not specified.
+   */
+  needsValues?: boolean;
+
+  /**
+   * Whether the collector needs elements in their original order.
+   * If false, the stream may process elements out of order for better performance.
+   * Default is true if not specified.
+   */
+  needsOrdering?: boolean;
+}
+
 export interface Collector<T, U> {
   collectPart(part: T[] | null): CollectorCollectPartResult<U>;
+
+  /**
+   * Optional method to provide hints about what information the collector needs.
+   * Streams can use these hints to optimize processing (e.g., skip computing
+   * values if only counting, process out of order if ordering doesn't matter).
+   */
+  getHints?(): CollectorHints;
 }
 
 export interface StatelessTransformer<T, U> {

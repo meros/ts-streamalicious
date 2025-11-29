@@ -13,4 +13,11 @@ export default class ArrayCollector<T> implements types.Collector<T, T[]> {
     this.result = this.result.concat(part);
     return { done: false };
   }
+
+  public getHints(): types.CollectorHints {
+    return {
+      needsValues: true,
+      needsOrdering: true,
+    };
+  }
 }
