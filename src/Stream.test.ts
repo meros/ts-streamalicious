@@ -198,11 +198,11 @@ describe("Stream class", () => {
       expect(maxConcurrent).toBeGreaterThan(1);
     });
 
-    test("handles 100 concurrent fetch-like operations efficiently", async () => {
+    test("handles 100 items with bounded concurrency (default max 10)", async () => {
       const itemCount = 100;
       const items = Array.from({ length: itemCount }, (_, i) => i + 1);
 
-      // Track execution timing
+      // Track execution timing and concurrency
       let currentConcurrent = 0;
       let maxConcurrent = 0;
       const startTime = Date.now();
@@ -227,10 +227,69 @@ describe("Stream class", () => {
       expect(result[itemCount - 1]).toBe(itemCount * 2);
 
       // If sequential, would take at least 100 * 10ms = 1000ms
-      // Parallel execution should be much faster
+      // With bounded parallelism (default 10), should be ~100ms (100 items / 10 concurrent * 10ms)
       expect(elapsedTime).toBeLessThan(500);
 
-      // Should have significant concurrency
+      // Should respect max concurrency limit (default is 10)
+      expect(maxConcurrent).toBeLessThanOrEqual(10);
+      expect(maxConcurrent).toBeGreaterThan(1);
+    });
+
+    test("respects custom maxConcurrency option", async () => {
+      const itemCount = 50;
+      const items = Array.from({ length: itemCount }, (_, i) => i + 1);
+      const customMaxConcurrency = 5;
+
+      let currentConcurrent = 0;
+      let maxConcurrent = 0;
+
+      const result = await streamables
+        .fromArray(items)
+        .transform<number>(
+          async (val) => {
+            currentConcurrent++;
+            maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            currentConcurrent--;
+            return val * 2;
+          },
+          { maxConcurrency: customMaxConcurrency }
+        )
+        .toArray();
+
+      expect(result).toHaveLength(itemCount);
+      expect(result[0]).toBe(2);
+
+      // Should respect the custom max concurrency limit
+      expect(maxConcurrent).toBeLessThanOrEqual(customMaxConcurrency);
+      expect(maxConcurrent).toBeGreaterThan(1);
+    });
+
+    test("higher maxConcurrency allows more parallel operations", async () => {
+      const itemCount = 30;
+      const items = Array.from({ length: itemCount }, (_, i) => i + 1);
+      const highConcurrency = 30;
+
+      let currentConcurrent = 0;
+      let maxConcurrent = 0;
+
+      const result = await streamables
+        .fromArray(items)
+        .transform<number>(
+          async (val) => {
+            currentConcurrent++;
+            maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            currentConcurrent--;
+            return val * 2;
+          },
+          { maxConcurrency: highConcurrency }
+        )
+        .toArray();
+
+      expect(result).toHaveLength(itemCount);
+
+      // With high concurrency limit, all items can run in parallel
       expect(maxConcurrent).toBeGreaterThan(10);
     });
 
@@ -248,22 +307,27 @@ describe("Stream class", () => {
       expect(result).toEqual([1, 2, 3, 4, 5]);
     });
 
-    test("parallel flatMap operations", async () => {
+    test("flatMap respects maxConcurrency option", async () => {
+      const customMaxConcurrency = 3;
       let maxConcurrent = 0;
       let currentConcurrent = 0;
 
       const result = await streamables
-        .fromArray([1, 2, 3, 4, 5])
-        .flatMap<number>(async (val) => {
-          currentConcurrent++;
-          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-          await new Promise((resolve) => setTimeout(resolve, 20));
-          currentConcurrent--;
-          return streamables.fromArray([val, val * 10]);
-        })
+        .fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        .flatMap<number>(
+          async (val) => {
+            currentConcurrent++;
+            maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+            await new Promise((resolve) => setTimeout(resolve, 20));
+            currentConcurrent--;
+            return streamables.fromArray([val, val * 10]);
+          },
+          { maxConcurrency: customMaxConcurrency }
+        )
         .toArray();
 
-      expect(result).toEqual([1, 10, 2, 20, 3, 30, 4, 40, 5, 50]);
+      expect(result).toEqual([1, 10, 2, 20, 3, 30, 4, 40, 5, 50, 6, 60, 7, 70, 8, 80, 9, 90, 10, 100]);
+      expect(maxConcurrent).toBeLessThanOrEqual(customMaxConcurrency);
       expect(maxConcurrent).toBeGreaterThan(1);
     });
 
@@ -291,6 +355,39 @@ describe("Stream class", () => {
       // Even with chained transforms, parallel processing keeps it fast
       // Sequential would be: 50 * 10ms * 2 transforms = 1000ms
       expect(elapsedTime).toBeLessThan(500);
+    });
+
+    test("bounded concurrency prevents resource exhaustion", async () => {
+      // Simulate 100 "network requests" that would overwhelm resources if all ran at once
+      const itemCount = 100;
+      const items = Array.from({ length: itemCount }, (_, i) => i + 1);
+      const maxAllowedConcurrency = 10;
+
+      let currentConcurrent = 0;
+      let maxConcurrent = 0;
+      let overLimitCount = 0;
+
+      const result = await streamables
+        .fromArray(items)
+        .transform<number>(
+          async (val) => {
+            currentConcurrent++;
+            if (currentConcurrent > maxAllowedConcurrency) {
+              overLimitCount++;
+            }
+            maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            currentConcurrent--;
+            return val;
+          },
+          { maxConcurrency: maxAllowedConcurrency }
+        )
+        .toArray();
+
+      expect(result).toHaveLength(itemCount);
+      // Should never exceed the limit
+      expect(overLimitCount).toBe(0);
+      expect(maxConcurrent).toBeLessThanOrEqual(maxAllowedConcurrency);
     });
   });
 

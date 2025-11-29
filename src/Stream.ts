@@ -17,10 +17,15 @@ export default class Stream<T> {
    * Transform each element using a function that returns a value or Promise.
    * Modern async/await API - preferred over transformCb.
    * Accepts both sync and async functions for flexibility.
+   * @param transform - Function to transform each element
+   * @param options - Optional settings including maxConcurrency (default: 10)
    */
-  public transform<U>(transform: types.PromiseTransformerOperation<T, U>): Stream<U> {
+  public transform<U>(
+    transform: types.PromiseTransformerOperation<T, U>,
+    options?: types.TransformOptions
+  ): Stream<U> {
     return this.coreStream.coreStatelessTransform(
-      statelesstransforms.promiseTransform(transform),
+      statelesstransforms.promiseTransform(transform, options?.maxConcurrency),
       Stream.create
     );
   }
@@ -29,10 +34,15 @@ export default class Stream<T> {
    * FlatMap each element using a function that returns a Stream or Promise<Stream>.
    * Modern async/await API - preferred over flatMapCb.
    * Accepts both sync and async functions for flexibility.
+   * @param transform - Function to transform each element into a Stream
+   * @param options - Optional settings including maxConcurrency (default: 10)
    */
-  public flatMap<U>(transform: types.PromiseTransformerOperation<T, Stream<U>>): Stream<U> {
+  public flatMap<U>(
+    transform: types.PromiseTransformerOperation<T, Stream<U>>,
+    options?: types.TransformOptions
+  ): Stream<U> {
     return this.coreStream.coreStatelessTransform(
-      statelesstransforms.promiseFlatMap(transform),
+      statelesstransforms.promiseFlatMap(transform, options?.maxConcurrency),
       Stream.create
     );
   }
