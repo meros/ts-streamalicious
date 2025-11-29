@@ -28,42 +28,56 @@ npm install @meros/streamalicious
 
 ## Quick Start
 
+The library uses modern async/await as its first-class API:
+
 ```typescript
 import { streamables, collectors } from "@meros/streamalicious";
 
-// Basic array processing
-streamables
+// Basic array processing - transform() works with both sync and async functions
+const result = await streamables
   .fromArray([1, 2, 3, 4, 5])
-  .transformSync((x) => x * 2)
-  .toArray((result) => {
-    console.log(result); // [2, 4, 6, 8, 10]
-  });
+  .transform((x) => x * 2) // sync function works!
+  .toArray();
+console.log(result); // [2, 4, 6, 8, 10]
 
-// Async transformations
-streamables
+// Async transformations with Promises
+const squared = await streamables
   .fromArray([1, 2, 3])
-  .transform((val, callback) => {
-    setTimeout(() => callback(val * val), 100);
+  .transform(async (val) => {
+    // Simulate async operation
+    return val * val;
   })
-  .toArray((result) => {
-    console.log(result); // [1, 4, 9]
-  });
+  .toArray();
+console.log(squared); // [1, 4, 9]
+
+// Mix sync and async transforms seamlessly
+const mixed = await streamables
+  .fromArray([1, 2, 3])
+  .transform((x) => x * 2) // sync
+  .transform(async (x) => x + 1) // async
+  .transform((x) => x.toString()) // sync
+  .toArray();
+console.log(mixed); // ["3", "5", "7"]
 
 // FlatMap operations
-streamables
+const flattened = await streamables
   .fromArray([[1, 2], [3], [4, 5]])
-  .flatMapSync((arr) => streamables.fromArray(arr))
-  .toArray((result) => {
-    console.log(result); // [1, 2, 3, 4, 5]
-  });
+  .flatMap((arr) => streamables.fromArray(arr)) // works with sync too!
+  .toArray();
+console.log(flattened); // [1, 2, 3, 4, 5]
 
-// Custom collectors
-streamables
+// Custom collectors with async/await
+const joined = await streamables
   .fromArray([1, 2, 3, 4, 5])
-  .transformSync((x) => x.toString())
-  .collect(collectors.toJointString(", "), (result) => {
-    console.log(result); // "1, 2, 3, 4, 5"
-  });
+  .transform((x) => x.toString())
+  .collect(collectors.toJointString(", "));
+console.log(joined); // "1, 2, 3, 4, 5"
+
+// Count elements
+const count = await streamables
+  .fromArray([1, 2, 3, 4, 5])
+  .count();
+console.log(count); // 5
 ```
 
 ## API
@@ -72,21 +86,60 @@ streamables
 
 - `streamables.fromArray<T>(array: T[])` - Create a stream from an array
 
-### Stream Methods
+### Stream Methods (Modern async/await API)
 
-- `.transform<U>(fn: (value: T, callback: (result: U) => void) => void)` - Async transform
-- `.transformSync<U>(fn: (value: T) => U)` - Sync transform
-- `.flatMap<U>(fn: (value: T, callback: (stream: Stream<U>) => void) => void)` - Async flatMap
-- `.flatMapSync<U>(fn: (value: T) => Stream<U>)` - Sync flatMap
-- `.collect<U>(collector: Collector<T, U>, callback: (result: U) => void)` - Collect with custom collector
-- `.toArray(callback: (result: T[]) => void)` - Collect to array
-- `.count(callback: (count: number) => void)` - Count elements
+These are the primary, first-class methods that return Promises:
+
+- `.transform<U>(fn: (value: T) => U | Promise<U>)` - Transform each element (accepts both sync and async functions)
+- `.transformSync<U>(fn: (value: T) => U)` - Transform each element synchronously (slightly more efficient for pure sync transforms)
+- `.flatMap<U>(fn: (value: T) => Stream<U> | Promise<Stream<U>>)` - FlatMap (accepts both sync and async functions)
+- `.flatMapSync<U>(fn: (value: T) => Stream<U>)` - FlatMap synchronously (slightly more efficient for pure sync transforms)
+- `.collect<U>(collector: Collector<T, U>): Promise<U>` - Collect with custom collector
+- `.toArray(): Promise<T[]>` - Collect all elements to array
+- `.count(): Promise<number>` - Count all elements
+
+### Legacy Callback-based API (Deprecated)
+
+These callback-based methods are preserved for backwards compatibility:
+
+- `.transformCb<U>(fn: (value: T, callback: (result: U) => void) => void)` - Async transform with callback
+- `.flatMapCb<U>(fn: (value: T, callback: (stream: Stream<U>) => void) => void)` - Async flatMap with callback
+- `.collectCb<U>(collector: Collector<T, U>, callback: (result: U) => void)` - Collect with callback
+- `.toArrayCb(callback: (result: T[]) => void)` - Collect to array with callback
+- `.countCb(callback: (count: number) => void)` - Count with callback
 
 ### Collectors
 
 - `collectors.toArray<T>()` - Collect elements into an array
 - `collectors.toCount<T>()` - Count elements
 - `collectors.toJointString(separator: string)` - Join strings with separator
+
+## Migration from Callback API
+
+If you're upgrading from an older version that used callback-based APIs, here's how to migrate:
+
+**Before (callback-based):**
+```typescript
+streamables
+  .fromArray([1, 2, 3])
+  .transform((val, callback) => {
+    callback(val * 2);
+  })
+  .toArray((result) => {
+    console.log(result);
+  });
+```
+
+**After (async/await):**
+```typescript
+const result = await streamables
+  .fromArray([1, 2, 3])
+  .transform(async (val) => val * 2)
+  .toArray();
+console.log(result);
+```
+
+The callback-based methods are still available with the `Cb` suffix for backwards compatibility.
 
 ## Development
 

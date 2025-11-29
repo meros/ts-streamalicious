@@ -18,6 +18,19 @@ export default class CoreStream<T> {
     );
   }
 
+  /**
+   * Promise-based collect operation (modern async/await API).
+   */
+  public coreCollectAsync<U>(collector: types.Collector<T, U>): Promise<U> {
+    return new Promise<U>((resolve) => {
+      this.coreCollect(collector, resolve);
+    });
+  }
+
+  /**
+   * @deprecated Use coreCollectAsync for modern async/await API.
+   * Callback-based collect operation (legacy API).
+   */
   public coreCollect<U>(collector: types.Collector<T, U>, callback: types.Consumer<U>) {
     let done: boolean = false;
     const queue = new AsyncQueue<T[] | null>(50, () => {
