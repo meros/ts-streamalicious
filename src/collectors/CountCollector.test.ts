@@ -33,3 +33,32 @@ test("getHints returns needsValues: false and needsOrdering: false", () => {
   expect(hints.needsValues).toBe(false);
   expect(hints.needsOrdering).toBe(false);
 });
+
+describe("collectPartCount (pull-based optimization)", () => {
+  test("collects counts directly without values", () => {
+    const countCollector = new CountCollector<number>();
+    expect(countCollector.collectPartCount(3)).toEqual({ done: false });
+    expect(countCollector.collectPartCount(3)).toEqual({ done: false });
+    expect(countCollector.collectPartCount(null)).toEqual({
+      done: true,
+      value: 6,
+    });
+  });
+
+  test("handles zero count", () => {
+    const countCollector = new CountCollector<number>();
+    expect(countCollector.collectPartCount(0)).toEqual({ done: false });
+    expect(countCollector.collectPartCount(null)).toEqual({
+      done: true,
+      value: 0,
+    });
+  });
+
+  test("handles null immediately", () => {
+    const countCollector = new CountCollector<number>();
+    expect(countCollector.collectPartCount(null)).toEqual({
+      done: true,
+      value: 0,
+    });
+  });
+});

@@ -1,5 +1,6 @@
 import * as streamables from "./streamables";
 import * as collectors from "./collectors";
+import * as types from "./types";
 
 describe("Stream class", () => {
   // ==========================================
@@ -626,6 +627,46 @@ describe("Stream class", () => {
 
       expect(count).toBe(0);
       expect(transformCallCount).toBe(0);
+    });
+
+    test("fallback to placeholder array for collectors without collectPartCount", async () => {
+      // Create a custom collector that has needsValues: false but doesn't implement collectPartCount
+      const collectedCounts: number[] = [];
+
+      class CustomCountCollector implements types.Collector<number, number> {
+        private count = 0;
+
+        collectPart(part: number[] | null): types.CollectorCollectPartResult<number> {
+          if (!part) {
+            return { done: true, value: this.count };
+          }
+          // This collector uses part.length, so it doesn't need actual values
+          this.count += part.length;
+          collectedCounts.push(part.length);
+          return { done: false };
+        }
+
+        getHints(): types.CollectorHints {
+          return { needsValues: false, needsOrdering: false };
+        }
+        // Note: No collectPartCount method - should fall back to placeholder array
+      }
+
+      let transformCallCount = 0;
+
+      const count = await streamables
+        .fromArray([1, 2, 3, 4, 5])
+        .transformSync((x) => {
+          transformCallCount++;
+          return x * 2;
+        })
+        .collect(new CustomCountCollector());
+
+      expect(count).toBe(5);
+      // The transform should NOT be called because the collector has needsValues: false
+      expect(transformCallCount).toBe(0);
+      // The collector should have received a placeholder array with the correct length
+      expect(collectedCounts).toEqual([5]);
     });
   });
 });

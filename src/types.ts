@@ -46,6 +46,13 @@ export interface Collector<T, U> {
   collectPart(part: T[] | null): CollectorCollectPartResult<U>;
 
   /**
+   * Optional method to collect only the count of elements without needing actual values.
+   * Used for pull-based optimization when the collector has needsValues: false.
+   * If not implemented, falls back to creating a placeholder array.
+   */
+  collectPartCount?(count: number | null): CollectorCollectPartResult<U>;
+
+  /**
    * Optional method to provide hints about what information the collector needs.
    * Streams can use these hints to optimize processing (e.g., skip computing
    * values if only counting, process out of order if ordering doesn't matter).

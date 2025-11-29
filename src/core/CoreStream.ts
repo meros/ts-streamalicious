@@ -65,10 +65,10 @@ export default class CoreStream<T> {
         // A count is delivered (these are called in order)
         (count: number | null) => {
           if (!done) {
-            // Create a placeholder array with the right length for the collector
-            // The collector only needs the count, not actual values
-            const part = count === null ? null : (new Array(count) as T[]);
-            const result = collector.collectPart(part);
+            // Use collectPartCount if available, otherwise fall back to placeholder array
+            const result = collector.collectPartCount
+              ? collector.collectPartCount(count)
+              : collector.collectPart(count === null ? null : (new Array(count) as T[]));
             done = result.done || count === null;
             if (done && result.value !== undefined) {
               // Since we are done, lets call the initiator of the collection operation
@@ -79,7 +79,7 @@ export default class CoreStream<T> {
       );
     };
 
-    // Boot strap collecting
+    // Bootstrap collecting
     collectOne();
   }
 
@@ -113,7 +113,7 @@ export default class CoreStream<T> {
       );
     };
 
-    // Boot strap collecting
+    // Bootstrap collecting
     collectOne();
   }
 }
