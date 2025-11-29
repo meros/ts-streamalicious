@@ -14,6 +14,74 @@ Streams are nice and flexible for array processing, and async streams enable you
 
 JavaScript has stream-like behavior built in (array prototypes), but these are synchronous and directly connected to the Array prototype, which means they're not always usable for non-array stream-like objects (generators, async iterables, etc).
 
+## ⚡ Bounded Parallel Processing
+
+One of the unique strengths of this library is **bounded parallel execution** of async operations. When you have many items to process with async transforms (like network requests), they run in parallel automatically with built-in concurrency limits — preventing resource exhaustion while maximizing throughput.
+
+### The Problem
+
+Need to fetch 100 URLs? With traditional approaches, you either:
+- Process them sequentially (slow - each request waits for the previous one)
+- Use `Promise.all()` on all 100 (risky - may exhaust network connections or hit rate limits)
+- Write complex concurrency management code
+
+### The Solution
+
+Streamalicious handles this automatically with bounded parallelism:
+
+```typescript
+import { streamables } from "@meros/streamalicious";
+
+// Process 100 items with bounded parallel async operations (default: max 10 concurrent)
+const urls = Array.from({ length: 100 }, (_, i) => `https://api.example.com/item/${i}`);
+
+const results = await streamables
+  .fromArray(urls)
+  .transform(async (url) => {
+    const response = await fetch(url);
+    return response.json();
+  })
+  .toArray();
+
+// Fetches run in parallel (max 10 at a time), results arrive in original order
+console.log(results.length); // 100
+```
+
+### Configurable Concurrency
+
+You can customize the maximum number of concurrent operations:
+
+```typescript
+// Limit to 5 concurrent operations (e.g., for strict rate limits)
+const results = await streamables
+  .fromArray(urls)
+  .transform(
+    async (url) => {
+      const response = await fetch(url);
+      return response.json();
+    },
+    { maxConcurrency: 5 }
+  )
+  .toArray();
+
+// Or increase for faster processing when resources allow
+const fastResults = await streamables
+  .fromArray(urls)
+  .transform(
+    async (url) => fetch(url).then(r => r.json()),
+    { maxConcurrency: 20 }
+  )
+  .toArray();
+```
+
+### Benefits
+
+- **Bounded parallelism**: Async operations run concurrently with configurable limits (default: 10) to prevent resource exhaustion
+- **Order preservation**: Results always arrive in the original input order, regardless of completion time
+- **Simple API**: No need to manage promises, queues, or concurrency limits manually
+- **Configurable**: Adjust `maxConcurrency` to match your use case (API rate limits, resource constraints, etc.)
+- **Efficient**: Much faster than sequential processing while being safer than unbounded `Promise.all()`
+
 ## Why TypeScript?
 
 Stream libraries benefit heavily from type support.
@@ -90,9 +158,9 @@ console.log(count); // 5
 
 These are the primary, first-class methods that return Promises:
 
-- `.transform<U>(fn: (value: T) => U | Promise<U>)` - Transform each element (accepts both sync and async functions)
+- `.transform<U>(fn: (value: T) => U | Promise<U>, options?: { maxConcurrency?: number })` - Transform each element (accepts both sync and async functions). Default maxConcurrency is 10.
 - `.transformSync<U>(fn: (value: T) => U)` - Transform each element synchronously (slightly more efficient for pure sync transforms)
-- `.flatMap<U>(fn: (value: T) => Stream<U> | Promise<Stream<U>>)` - FlatMap (accepts both sync and async functions)
+- `.flatMap<U>(fn: (value: T) => Stream<U> | Promise<Stream<U>>, options?: { maxConcurrency?: number })` - FlatMap (accepts both sync and async functions). Default maxConcurrency is 10.
 - `.flatMapSync<U>(fn: (value: T) => Stream<U>)` - FlatMap synchronously (slightly more efficient for pure sync transforms)
 - `.collect<U>(collector: Collector<T, U>): Promise<U>` - Collect with custom collector
 - `.toArray(): Promise<T[]>` - Collect all elements to array

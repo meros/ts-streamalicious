@@ -43,3 +43,15 @@ export interface SyncTransformerOperation<T, U> {
 export interface PromiseTransformerOperation<T, U> {
   (value: T): U | Promise<U>;
 }
+
+/**
+ * Options for transform operations.
+ */
+export interface TransformOptions {
+  /**
+   * Maximum number of concurrent operations.
+   * Limits how many async operations can run in parallel.
+   * Default is 10.
+   */
+  maxConcurrency?: number;
+}

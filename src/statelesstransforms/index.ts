@@ -8,10 +8,13 @@ import AsyncTransformer from "./AsyncTransformer";
  * Supports both sync and async (Promise-returning) functions.
  */
 export function promiseTransform<T, U>(
-  transform: types.PromiseTransformerOperation<T, U>
+  transform: types.PromiseTransformerOperation<T, U>,
+  maxConcurrency?: number
 ): types.StatelessTransformer<T, U> {
-  return new AsyncTransformer<T, U>((value: T, callback: types.Consumer<U[]>) =>
-    Promise.resolve(transform(value)).then((result: U) => callback([result]))
+  return new AsyncTransformer<T, U>(
+    (value: T, callback: types.Consumer<U[]>) =>
+      Promise.resolve(transform(value)).then((result: U) => callback([result])),
+    maxConcurrency
   );
 }
 
@@ -20,12 +23,15 @@ export function promiseTransform<T, U>(
  * Supports both sync and async (Promise-returning) functions.
  */
 export function promiseFlatMap<T, U>(
-  transform: types.PromiseTransformerOperation<T, Stream<U>>
+  transform: types.PromiseTransformerOperation<T, Stream<U>>,
+  maxConcurrency?: number
 ): types.StatelessTransformer<T, U> {
   // This implementation has the same problem as Java flatmap, it unpacks the entire stream forcefully.
   // This has performance impacts on limited streams and hangs on unlimited streams.
-  return new AsyncTransformer<T, U>((value: T, callback: types.Consumer<U[]>) =>
-    Promise.resolve(transform(value)).then((stream: Stream<U>) => stream.toArrayCb(callback))
+  return new AsyncTransformer<T, U>(
+    (value: T, callback: types.Consumer<U[]>) =>
+      Promise.resolve(transform(value)).then((stream: Stream<U>) => stream.toArrayCb(callback)),
+    maxConcurrency
   );
 }
 
