@@ -5,8 +5,10 @@ export default class FirstCollector<T> implements types.Collector<T, T | undefin
   private found: boolean = false;
 
   public collectPart(part: T[] | null): types.CollectorCollectPartResult<T | undefined> {
+    // Defensive check: if already found, return cached result
+    // This shouldn't happen with normal framework usage since we return done=true,
+    // but provides safety if collectPart is called directly by external code
     if (this.found) {
-      // Already found, just return done
       return { done: true, value: this.result };
     }
 
