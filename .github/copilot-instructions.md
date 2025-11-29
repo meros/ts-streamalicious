@@ -34,7 +34,7 @@ npm run playground:dev
 ### TypeScript
 - Use strict TypeScript (`"strict": true` in tsconfig.json)
 - Target ES2020
-- Use CommonJS modules
+- Build output uses CommonJS modules
 - Always provide explicit types for function parameters
 - Prefix unused parameters with underscore (e.g., `_unusedParam`)
 
@@ -43,7 +43,7 @@ npm run playground:dev
 - Use semicolons
 - 2-space indentation
 - Trailing commas in ES5-compatible positions
-- 100 character line width
+- 100 character print width
 - Always use parentheses around arrow function parameters
 
 ### Linting (ESLint)
