@@ -33,10 +33,10 @@ The library uses modern async/await as its first-class API:
 ```typescript
 import { streamables, collectors } from "@meros/streamalicious";
 
-// Basic array processing with async/await
+// Basic array processing - transform() works with both sync and async functions
 const result = await streamables
   .fromArray([1, 2, 3, 4, 5])
-  .transformSync((x) => x * 2)
+  .transform((x) => x * 2) // sync function works!
   .toArray();
 console.log(result); // [2, 4, 6, 8, 10]
 
@@ -50,17 +50,26 @@ const squared = await streamables
   .toArray();
 console.log(squared); // [1, 4, 9]
 
-// FlatMap operations with async/await
+// Mix sync and async transforms seamlessly
+const mixed = await streamables
+  .fromArray([1, 2, 3])
+  .transform((x) => x * 2) // sync
+  .transform(async (x) => x + 1) // async
+  .transform((x) => x.toString()) // sync
+  .toArray();
+console.log(mixed); // ["3", "5", "7"]
+
+// FlatMap operations
 const flattened = await streamables
   .fromArray([[1, 2], [3], [4, 5]])
-  .flatMapSync((arr) => streamables.fromArray(arr))
+  .flatMap((arr) => streamables.fromArray(arr)) // works with sync too!
   .toArray();
 console.log(flattened); // [1, 2, 3, 4, 5]
 
 // Custom collectors with async/await
 const joined = await streamables
   .fromArray([1, 2, 3, 4, 5])
-  .transformSync((x) => x.toString())
+  .transform((x) => x.toString())
   .collect(collectors.toJointString(", "));
 console.log(joined); // "1, 2, 3, 4, 5"
 
@@ -81,10 +90,10 @@ console.log(count); // 5
 
 These are the primary, first-class methods that return Promises:
 
-- `.transform<U>(fn: (value: T) => Promise<U>)` - Transform each element with a Promise-returning function
-- `.transformSync<U>(fn: (value: T) => U)` - Transform each element synchronously
-- `.flatMap<U>(fn: (value: T) => Promise<Stream<U>>)` - FlatMap with a Promise-returning function
-- `.flatMapSync<U>(fn: (value: T) => Stream<U>)` - FlatMap synchronously
+- `.transform<U>(fn: (value: T) => U | Promise<U>)` - Transform each element (accepts both sync and async functions)
+- `.transformSync<U>(fn: (value: T) => U)` - Transform each element synchronously (slightly more efficient for pure sync transforms)
+- `.flatMap<U>(fn: (value: T) => Stream<U> | Promise<Stream<U>>)` - FlatMap (accepts both sync and async functions)
+- `.flatMapSync<U>(fn: (value: T) => Stream<U>)` - FlatMap synchronously (slightly more efficient for pure sync transforms)
 - `.collect<U>(collector: Collector<T, U>): Promise<U>` - Collect with custom collector
 - `.toArray(): Promise<T[]>` - Collect all elements to array
 - `.count(): Promise<number>` - Count all elements

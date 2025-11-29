@@ -36,9 +36,10 @@ export interface SyncTransformerOperation<T, U> {
 }
 
 /**
- * Modern Promise-based async transformer operation.
+ * Modern async transformer operation.
+ * Supports both sync and async (Promise-returning) functions.
  * Use this for async/await transforms.
  */
 export interface PromiseTransformerOperation<T, U> {
-  (value: T): Promise<U>;
+  (value: T): U | Promise<U>;
 }

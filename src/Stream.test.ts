@@ -136,6 +136,39 @@ describe("Stream class", () => {
 
       expect(result).toEqual([1, 101, 2, 102]);
     });
+
+    test("transform with sync function (no async keyword)", async () => {
+      // transform() now accepts both sync and async functions
+      const result = await streamables
+        .fromArray([1, 2, 3])
+        .transform((val) => val * 2)
+        .toArray();
+
+      expect(result).toEqual([2, 4, 6]);
+    });
+
+    test("flatMap with sync function (no async keyword)", async () => {
+      // flatMap() now accepts both sync and async functions
+      const result = await streamables
+        .fromArray([1, 2, 3])
+        .flatMap((val) => streamables.fromArray([val, val * 10]))
+        .toArray();
+
+      expect(result).toEqual([1, 10, 2, 20, 3, 30]);
+    });
+
+    test("mixed transform with sync and async inline", async () => {
+      // Demonstrates that transform() can be used with sync functions
+      // making it easy to switch between sync and async as needed
+      const result = await streamables
+        .fromArray([1, 2, 3])
+        .transform((x) => x * 2) // sync
+        .transform(async (x) => x + 1) // async
+        .transform((x) => x.toString()) // sync
+        .toArray();
+
+      expect(result).toEqual(["3", "5", "7"]);
+    });
   });
 
   // ==========================================

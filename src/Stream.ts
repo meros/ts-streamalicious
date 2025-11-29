@@ -14,8 +14,9 @@ export default class Stream<T> {
   // ==========================================
 
   /**
-   * Transform each element using a Promise-returning function.
+   * Transform each element using a function that returns a value or Promise.
    * Modern async/await API - preferred over transformCb.
+   * Accepts both sync and async functions for flexibility.
    */
   public transform<U>(transform: types.PromiseTransformerOperation<T, U>): Stream<U> {
     return this.coreStream.coreStatelessTransform(
@@ -25,8 +26,9 @@ export default class Stream<T> {
   }
 
   /**
-   * FlatMap each element using a Promise-returning function.
+   * FlatMap each element using a function that returns a Stream or Promise<Stream>.
    * Modern async/await API - preferred over flatMapCb.
+   * Accepts both sync and async functions for flexibility.
    */
   public flatMap<U>(transform: types.PromiseTransformerOperation<T, Stream<U>>): Stream<U> {
     return this.coreStream.coreStatelessTransform(
