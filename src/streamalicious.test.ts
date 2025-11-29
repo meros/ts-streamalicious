@@ -70,12 +70,10 @@ describe("Modern async/await API", () => {
 
 describe("Legacy callback-based API (deprecated)", () => {
   test("Array source and collect with callback", (done) => {
-    streamalicious.streamables
-      .fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
-      .toArrayCb((result) => {
-        expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-        done();
-      });
+    streamalicious.streamables.fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]).toArrayCb((result) => {
+      expect(result).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      done();
+    });
   });
 
   test("Array source and count with callback", (done) => {
@@ -113,7 +111,10 @@ describe("Legacy callback-based API (deprecated)", () => {
     streamalicious.streamables
       .fromArray([[1, 2], [3], [4, 5, 6, 7], [], [8, 9, 10]])
       .flatMapCb<number>(
-        (value: number[], callback: streamalicious.types.Consumer<streamalicious.Stream<number>>) => {
+        (
+          value: number[],
+          callback: streamalicious.types.Consumer<streamalicious.Stream<number>>
+        ) => {
           callback(streamalicious.streamables.fromArray(value));
         }
       )
