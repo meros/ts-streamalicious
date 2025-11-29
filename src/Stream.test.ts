@@ -172,6 +172,129 @@ describe("Stream class", () => {
   });
 
   // ==========================================
+  // Parallel processing tests
+  // ==========================================
+
+  describe("Parallel processing", () => {
+    test("processes many items in parallel", async () => {
+      // Track concurrent execution count
+      let currentConcurrent = 0;
+      let maxConcurrent = 0;
+
+      const result = await streamables
+        .fromArray([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        .transform<number>(async (val) => {
+          currentConcurrent++;
+          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+          // Simulate async work
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          currentConcurrent--;
+          return val * 2;
+        })
+        .toArray();
+
+      expect(result).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+      // Should process multiple items concurrently
+      expect(maxConcurrent).toBeGreaterThan(1);
+    });
+
+    test("handles 100 concurrent fetch-like operations efficiently", async () => {
+      const itemCount = 100;
+      const items = Array.from({ length: itemCount }, (_, i) => i + 1);
+
+      // Track execution timing
+      let currentConcurrent = 0;
+      let maxConcurrent = 0;
+      const startTime = Date.now();
+
+      const result = await streamables
+        .fromArray(items)
+        .transform<number>(async (val) => {
+          currentConcurrent++;
+          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+          // Simulate a network request (10ms delay)
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          currentConcurrent--;
+          return val * 2;
+        })
+        .toArray();
+
+      const elapsedTime = Date.now() - startTime;
+
+      // Verify correct results
+      expect(result).toHaveLength(itemCount);
+      expect(result[0]).toBe(2);
+      expect(result[itemCount - 1]).toBe(itemCount * 2);
+
+      // If sequential, would take at least 100 * 10ms = 1000ms
+      // Parallel execution should be much faster
+      expect(elapsedTime).toBeLessThan(500);
+
+      // Should have significant concurrency
+      expect(maxConcurrent).toBeGreaterThan(10);
+    });
+
+    test("maintains result order despite varying async completion times", async () => {
+      const result = await streamables
+        .fromArray([1, 2, 3, 4, 5])
+        .transform<number>(async (val) => {
+          // Items with higher values complete faster (reverse order)
+          await new Promise((resolve) => setTimeout(resolve, (6 - val) * 10));
+          return val;
+        })
+        .toArray();
+
+      // Results should be in original order, not completion order
+      expect(result).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    test("parallel flatMap operations", async () => {
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+
+      const result = await streamables
+        .fromArray([1, 2, 3, 4, 5])
+        .flatMap<number>(async (val) => {
+          currentConcurrent++;
+          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          currentConcurrent--;
+          return streamables.fromArray([val, val * 10]);
+        })
+        .toArray();
+
+      expect(result).toEqual([1, 10, 2, 20, 3, 30, 4, 40, 5, 50]);
+      expect(maxConcurrent).toBeGreaterThan(1);
+    });
+
+    test("chained parallel transforms maintain efficiency", async () => {
+      const items = Array.from({ length: 50 }, (_, i) => i + 1);
+      const startTime = Date.now();
+
+      const result = await streamables
+        .fromArray(items)
+        .transform<number>(async (val) => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return val * 2;
+        })
+        .transform<string>(async (val) => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return `item-${val}`;
+        })
+        .toArray();
+
+      const elapsedTime = Date.now() - startTime;
+
+      expect(result).toHaveLength(50);
+      expect(result[0]).toBe("item-2");
+
+      // Even with chained transforms, parallel processing keeps it fast
+      // Sequential would be: 50 * 10ms * 2 transforms = 1000ms
+      expect(elapsedTime).toBeLessThan(500);
+    });
+  });
+
+  // ==========================================
   // Synchronous transforms tests (unchanged)
   // ==========================================
 

@@ -14,6 +14,46 @@ Streams are nice and flexible for array processing, and async streams enable you
 
 JavaScript has stream-like behavior built in (array prototypes), but these are synchronous and directly connected to the Array prototype, which means they're not always usable for non-array stream-like objects (generators, async iterables, etc).
 
+## ⚡ Automatic Parallel Processing
+
+One of the unique strengths of this library is **automatic parallel execution** of async operations. When you have many items to process with async transforms (like network requests), they run in parallel automatically — no complex configuration needed.
+
+### The Problem
+
+Need to fetch 100 URLs? With traditional approaches, you either:
+- Process them sequentially (slow - each request waits for the previous one)
+- Use `Promise.all()` on all 100 (risky - may exhaust network connections or hit rate limits)
+- Write complex concurrency management code
+
+### The Solution
+
+Streamalicious handles this automatically:
+
+```typescript
+import { streamables } from "@meros/streamalicious";
+
+// Process 100 items with parallel async operations - simple and efficient!
+const urls = Array.from({ length: 100 }, (_, i) => `https://api.example.com/item/${i}`);
+
+const results = await streamables
+  .fromArray(urls)
+  .transform(async (url) => {
+    const response = await fetch(url);
+    return response.json();
+  })
+  .toArray();
+
+// All 100 fetches run in parallel, results arrive in original order
+console.log(results.length); // 100
+```
+
+### Benefits
+
+- **Automatic parallelism**: Async operations run concurrently without manual orchestration
+- **Order preservation**: Results always arrive in the original input order, regardless of completion time
+- **Simple API**: No need to manage promises, queues, or concurrency limits manually
+- **Efficient**: Much faster than sequential processing while being safer than unbounded parallelism
+
 ## Why TypeScript?
 
 Stream libraries benefit heavily from type support.
