@@ -92,9 +92,7 @@ describe("Stream class", () => {
     });
 
     test("joining empty stream with async API", async () => {
-      const result = await streamables
-        .fromArray<string>([])
-        .collect(collectors.toJointString(","));
+      const result = await streamables.fromArray<string>([]).collect(collectors.toJointString(","));
 
       expect(result).toBe("");
     });
@@ -326,7 +324,9 @@ describe("Stream class", () => {
         )
         .toArray();
 
-      expect(result).toEqual([1, 10, 2, 20, 3, 30, 4, 40, 5, 50, 6, 60, 7, 70, 8, 80, 9, 90, 10, 100]);
+      expect(result).toEqual([
+        1, 10, 2, 20, 3, 30, 4, 40, 5, 50, 6, 60, 7, 70, 8, 80, 9, 90, 10, 100,
+      ]);
       expect(maxConcurrent).toBeLessThanOrEqual(customMaxConcurrency);
       expect(maxConcurrent).toBeGreaterThan(1);
     });

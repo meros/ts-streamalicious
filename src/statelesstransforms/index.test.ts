@@ -5,8 +5,8 @@ describe("statelesstransforms index", () => {
   // Modern Promise-based async API tests
   describe("Modern Promise-based API", () => {
     test("promiseTransform wraps values in arrays", (done) => {
-      const transformer = statelesstransforms.promiseTransform<number, number>(async (val) =>
-        val * 2
+      const transformer = statelesstransforms.promiseTransform<number, number>(
+        async (val) => val * 2
       );
 
       transformer.transformPart([1, 2, 3], (result) => {
@@ -45,9 +45,7 @@ describe("statelesstransforms index", () => {
 
     test("promiseFlatMap with delayed stream creation", (done) => {
       const transformer = statelesstransforms.promiseFlatMap<number[], number>((arr) => {
-        return new Promise((resolve) =>
-          setTimeout(() => resolve(streamables.fromArray(arr)), 10)
-        );
+        return new Promise((resolve) => setTimeout(() => resolve(streamables.fromArray(arr)), 10));
       });
 
       transformer.transformPart(
