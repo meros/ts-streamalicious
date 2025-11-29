@@ -49,9 +49,9 @@ export default class CoreStream<T> {
           if (!done) {
             const result = collector.collectPart(part);
             done = result.done || !part;
-            if (done && result.value !== undefined) {
+            if (done && "value" in result) {
               // Since we are done, lets call the initiator of the collection operation
-              callback(result.value);
+              callback(result.value as U);
             }
           }
         }

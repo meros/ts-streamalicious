@@ -66,6 +66,36 @@ describe("Stream class", () => {
       expect(count).toBe(10);
     });
 
+    test("first returns Promise with first element", async () => {
+      const first = await streamables.fromArray([1, 2, 3, 4, 5]).first();
+
+      expect(first).toBe(1);
+    });
+
+    test("first returns undefined for empty stream", async () => {
+      const first = await streamables.fromArray<number>([]).first();
+
+      expect(first).toBeUndefined();
+    });
+
+    test("first with transform returns first transformed element", async () => {
+      const first = await streamables
+        .fromArray([1, 2, 3])
+        .transformSync((x) => x * 10)
+        .first();
+
+      expect(first).toBe(10);
+    });
+
+    test("first with async transform", async () => {
+      const first = await streamables
+        .fromArray([1, 2, 3])
+        .transform<number>(async (x) => x * 2)
+        .first();
+
+      expect(first).toBe(2);
+    });
+
     test("empty stream with async API", async () => {
       const result = await streamables
         .fromArray<number>([])

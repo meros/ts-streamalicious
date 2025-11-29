@@ -71,6 +71,15 @@ export default class Stream<T> {
     return this.collect(collectors.toCount());
   }
 
+  /**
+   * Get the first element of the stream, returning a Promise.
+   * Returns undefined if the stream is empty.
+   * Efficient: stops processing as soon as the first element is found.
+   */
+  public first(): Promise<T | undefined> {
+    return this.collect(collectors.toFirst<T>());
+  }
+
   // ==========================================
   // Synchronous transforms (unchanged)
   // ==========================================
